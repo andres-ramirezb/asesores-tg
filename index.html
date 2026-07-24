@@ -487,7 +487,9 @@
 /* =========================================================
    CONFIG
    ---------------------------------------------------------
-   https://script.google.com/macros/s/AKfycbwu5jn8Dx1CUmbI2b7FmC3kWBksV80qT6Dzm1kBaEIKi1998b_uzG-vMsPjc3KDN-Di/exec > Aplicación web".
+   PEGA AQUÍ la URL de tu implementación de Apps Script
+   (termina en /exec). La consigues después de "Implementar >
+   Nueva implementación > Aplicación web".
 ========================================================= */
 const API_URL = "https://script.google.com/macros/s/AKfycbwu5jn8Dx1CUmbI2b7FmC3kWBksV80qT6Dzm1kBaEIKi1998b_uzG-vMsPjc3KDN-Di/exec";
 const ADMIN_KEY = "6NXQpPJDOmFqASlb"; // debe coincidir con ADMIN_KEY en Code.gs
@@ -1013,7 +1015,7 @@ function switchView(name){
    INIT
 ========================================================= */
 (async function init(){
-  if(API_URL.indexOf("https://script.google.com/macros/s/AKfycbwu5jn8Dx1CUmbI2b7FmC3kWBksV80qT6Dzm1kBaEIKi1998b_uzG-vMsPjc3KDN-Di/exec") !== -1){
+  if(!API_URL || API_URL.indexOf("https://script.google.com/") !== 0){
     document.getElementById("profGrid").innerHTML =
       `<div class="empty-state">Falta configurar la conexión al backend.<br>Abre este archivo y reemplaza API_URL con la URL de tu Apps Script.</div>`;
     return;
