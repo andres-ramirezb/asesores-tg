@@ -340,6 +340,28 @@
     margin-bottom:16px;
     align-items:center;
   }
+  .merge-bar{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    background:var(--accent-soft);
+    border-radius:9px;
+    padding:12px 14px;
+    margin:14px 0;
+    font-size:0.82rem;
+  }
+  .merge-bar select, .merge-bar input[type=text]{
+    width:auto;
+    min-width:180px;
+    flex:1;
+  }
+  .merge-bar button{ white-space:nowrap; }
+  input.merge-check{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+  }
   .small-note{
     font-family: var(--font);
     font-size:0.76rem;
@@ -357,7 +379,7 @@
   }
   .grid-2{
     display:grid;
-    grid-template-columns:1fr 1fr;
+    grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
     gap:20px;
   }
   @media (max-width:720px){
@@ -402,6 +424,7 @@
   </div>
   <nav class="tabs">
     <button id="tabPublic" class="active" onclick="switchView('public')">Inscripción</button>
+    <button id="tabProf" onclick="switchView('profGate')">Acceso profesores</button>
     <button id="tabAdmin" onclick="switchView('adminGate')">Panel administrador</button>
   </nav>
 </header>
@@ -421,7 +444,7 @@
         <li>Escribe el título de la propuesta de grado (máximo 30 palabras).</li>
         <li>Confirma la inscripción. Te aparecerá un código de grupo — guárdalo como comprobante.</li>
       </ol>
-      <p class="small-note" style="margin-top:6px;">Cada persona solo puede aparecer en un grupo. Si ya estás inscrito en otro grupo, el sistema te lo indicará y no dejará continuar.</p>
+      <p class="small-note" style="margin-top:6px;">Cada persona solo puede aparecer en un grupo. Si ya estás inscrito en otro grupo, el sistema te lo indicará y no dejará continuar. Además, todos los integrantes deben haber aprobado Fundamentos de Investigación con nota igual o superior a 3.5.</p>
     </div>
 
     <div class="status-bar sans" id="statusBar"></div>
@@ -447,6 +470,43 @@
         <button class="secondary" onclick="cancelSelection()">Cancelar</button>
       </div>
       <div id="formMsg"></div>
+    </div>
+  </section>
+
+  <!-- ===================== ACCESO PROFESORES ===================== -->
+  <section id="view-profGate" class="view">
+    <div class="login-box sans">
+      <h2>Acceso profesores</h2>
+      <label for="profLoginSelect">Tu nombre</label>
+      <select id="profLoginSelect"></select>
+      <div style="margin-top:12px;">
+        <label for="profLoginPass">Clave</label>
+        <input type="text" id="profLoginPass" placeholder="Ingresa tu clave">
+      </div>
+      <div style="margin-top:14px;">
+        <button class="primary" onclick="tryProfLogin()">Entrar</button>
+      </div>
+      <div id="profLoginMsg"></div>
+    </div>
+  </section>
+
+  <!-- ===================== PANEL PROFESOR ===================== -->
+  <section id="view-prof" class="view">
+    <div class="admin-toolbar sans">
+      <strong id="profPanelTitle">Mis grupos</strong>
+      <span style="flex:1"></span>
+      <button class="danger-btn" onclick="logoutProf()">Salir</button>
+    </div>
+
+    <div class="panel">
+      <p class="small-note" id="profQuotaSummary"></p>
+      <p class="small-note">Marca la casilla de un grupo (o de varios) para recomponerlos entre sí — por ejemplo, unir a estudiantes que se inscribieron por separado contigo. Solo puedes combinar tus propios estudiantes; no puedes moverlos a otro profesor ni separar a integrantes de un mismo grupo.</p>
+      <div class="merge-bar sans" id="profMergeBar" style="display:none;">
+        <span id="profMergeCount">0 seleccionados (máximo 3)</span>
+        <input type="text" id="profMergeTitleInput" placeholder="Título de la propuesta del grupo combinado">
+        <button class="primary" id="profMergeBtn" onclick="combineProfGroups()" disabled>Combinar en un grupo</button>
+      </div>
+      <div id="profTableWrap"></div>
     </div>
   </section>
 
@@ -477,13 +537,20 @@
     <div class="panel">
       <h2>Sábana de matrícula</h2>
       <p class="small-note" id="adminSummary"></p>
+      <p class="small-note">Marca la casilla de cada estudiante para recomponer un grupo: por ejemplo, unir a estudiantes que se inscribieron individualmente y ahora quieren armar un grupo de hasta 3. Al combinarlos, salen de su(s) inscripción(es) actual(es) y quedan en un grupo nuevo.</p>
+      <div class="merge-bar sans" id="mergeBar" style="display:none;">
+        <span id="mergeCount">0 seleccionados (máximo 3)</span>
+        <select id="mergeProfSelect"></select>
+        <input type="text" id="mergeTitleInput" placeholder="Título de la propuesta del grupo combinado">
+        <button class="primary" id="mergeBtn" onclick="combineSelectedStudents()" disabled>Combinar en un grupo</button>
+      </div>
       <div id="sabanaTableWrap"></div>
     </div>
 
     <div class="grid-2">
       <div class="panel">
         <h2>Profesores y cupos</h2>
-        <p class="small-note">Formato: una línea por profesor → <code>Nombre | Área temática | Cupo</code></p>
+        <p class="small-note">Formato: una línea por profesor → <code>Nombre | Área temática | Cupo | Clave de acceso</code>. La clave es lo que el profesor usa para entrar a su propio panel y recomponer sus grupos — déjala vacía si ese profesor no debe tener acceso todavía.</p>
         <textarea id="profTextarea"></textarea>
         <div style="margin-top:10px;">
           <button class="primary" onclick="saveProfessorsFromText()">Guardar listado de profesores</button>
@@ -500,11 +567,22 @@
           <button class="secondary" onclick="loadStudentSample()">Ver muestra actual</button>
         </div>
       </div>
+
+      <div class="panel">
+        <h2>Prerrequisito: Fundamentos de Investigación</h2>
+        <p class="small-note">Formato: una línea por estudiante → <code>Cédula | ID/Código | Nombre completo | Nota</code>. Solo se permite inscribir estudiantes que aprobaron esta materia con nota igual o superior a <strong>3.5</strong>. La nota puede escribirse con punto o coma decimal. Base actual: <strong id="prereqDbCount">0</strong> registros.</p>
+        <textarea id="prereqTextarea" placeholder="1000123456 | EST-0231 | Juana Pérez Gómez | 4,2"></textarea>
+        <div style="margin-top:10px; display:flex; gap:10px;">
+          <button class="primary" onclick="savePrereqFromText()">Guardar base de Fundamentos de Investigación</button>
+          <button class="secondary" onclick="loadPrereqSample()">Ver muestra actual</button>
+        </div>
+        <p class="small-note" style="margin-top:10px; color:var(--warn);">Quien no aparezca en esta lista, o aparezca con nota inferior a 3.5, no podrá ser inscrito en ningún grupo.</p>
+      </div>
     </div>
 
     <div class="panel">
       <h2>Restablecer datos</h2>
-      <p class="small-note">Elimina todas las inscripciones registradas (los profesores y la base de estudiantes no se borran). Esta acción no se puede deshacer.</p>
+      <p class="small-note">Elimina todas las inscripciones registradas (los profesores y las bases de estudiantes no se borran). Esta acción no se puede deshacer.</p>
       <button class="danger-btn" onclick="resetEnrollments()">Borrar todas las inscripciones</button>
     </div>
 
@@ -529,9 +607,16 @@ const MAX_GROUP_SIZE = 3;
 ========================================================= */
 let professors = [];      // {id, name, area, quota, remaining}
 let enrollments = [];      // solo se carga en el panel admin: {id, groupCode, profId, profName, timestamp, students}
+let studentDBRaw = [];      // solo panel admin: filas crudas de la hoja Estudiantes, para previsualizar
+let prereqDBRaw = [];       // solo panel admin: filas crudas de Fundamentos de Investigación, para previsualizar
 let selectedProfId = null;
 let isAdmin = false;
 let cedulaLookupTimer = null;
+let prereqCheckTimer = null;
+let mergeSelection = new Map(); // key: groupId -> {groupId, profId, profName, students:[{cedula,code,name}]} — GRUPOS completos marcados (admin)
+let profSession = null; // {profId, pin, profName, quota, remaining}
+let profGroupsData = []; // grupos propios cargados en el panel de profesor
+let profMergeSelection = new Map(); // key: groupId -> {groupId, students:[{cedula,code,name}]} — grupos marcados (panel profesor)
 
 /* =========================================================
    LLAMADAS AL BACKEND
@@ -559,6 +644,7 @@ async function loadPublicState(){
     console.error("Error cargando estado", e);
     professors = [];
   }
+  populateProfLoginSelect();
 }
 
 async function loadAdminData(){
@@ -568,9 +654,12 @@ async function loadAdminData(){
       alert("No se pudo cargar el panel: " + data.error);
       return;
     }
-    professors = (data.professors||[]).map(p=>({ id:p.id, name:p.nombre, area:p.area, quota:Number(p.cupo)||0 }));
+    professors = (data.professors||[]).map(p=>({ id:p.id, name:p.nombre, area:p.area, quota:Number(p.cupo)||0, pin:p.clave||"" }));
     enrollments = data.enrollments || [];
+    studentDBRaw = data.students || [];
+    prereqDBRaw = data.prereq || [];
     document.getElementById("studentDbCount").textContent = data.studentCount || 0;
+    document.getElementById("prereqDbCount").textContent = data.prereqCount || 0;
   }catch(e){
     console.error("Error cargando panel admin", e);
     alert("No se pudo conectar con el backend. Revisa la URL configurada.");
@@ -707,7 +796,7 @@ function onIdentifierInput(input){
   const cedVal = row.querySelector(".ced-input").value.trim();
   const value = input.classList.contains("code-input") ? codeVal : cedVal;
 
-  if(!value){ tag.textContent=""; return; }
+  if(!value){ tag.textContent=""; row.dataset.eligible=""; return; }
 
   tag.textContent = "Buscando…";
   tag.className = "autofill-tag";
@@ -715,7 +804,10 @@ function onIdentifierInput(input){
   clearTimeout(cedulaLookupTimer);
   cedulaLookupTimer = setTimeout(async ()=>{
     try{
-      const data = await apiGet({ action:"lookupStudent", value: value });
+      const [studentData, prereqData] = await Promise.all([
+        apiGet({ action:"lookupStudent", value: value }),
+        apiGet({ action:"checkPrereq", cedula: cedVal, code: codeVal })
+      ]);
       // el usuario pudo seguir escribiendo; solo aplica si el valor consultado no cambió
       const stillCurrent = input.classList.contains("code-input")
         ? row.querySelector(".code-input").value.trim() === value
@@ -727,20 +819,38 @@ function onIdentifierInput(input){
       const codeInput = row.querySelector(".code-input");
       const cedInput = row.querySelector(".ced-input");
 
-      if(data.found){
-        nameInput.value = data.student.name;
-        emailInput.value = data.student.email;
+      let statusMsg = "";
+      let statusClass = "found";
+
+      if(studentData.found){
+        nameInput.value = studentData.student.name;
+        emailInput.value = studentData.student.email;
         // completa el identificador que faltaba, sin pisar el que la persona ya escribió
-        if(input.classList.contains("code-input") && !cedInput.value.trim()) cedInput.value = data.student.cedula;
-        if(input.classList.contains("ced-input") && !codeInput.value.trim()) codeInput.value = data.student.code;
-        tag.textContent = "Encontrado en la base de datos";
-        tag.className = "autofill-tag found";
+        if(input.classList.contains("code-input") && !cedInput.value.trim()) cedInput.value = studentData.student.cedula;
+        if(input.classList.contains("ced-input") && !codeInput.value.trim()) codeInput.value = studentData.student.code;
+        statusMsg = "Encontrado en la base de datos";
         row.dataset.manual = "false";
       }else{
-        tag.textContent = "No encontrado — completa los datos manualmente";
-        tag.className = "autofill-tag notfound";
+        statusMsg = "No encontrado — completa los datos manualmente";
+        statusClass = "notfound";
         row.dataset.manual = "true";
       }
+
+      if(!prereqData.found){
+        statusMsg += " · No registra Fundamentos de Investigación";
+        statusClass = "notfound";
+        row.dataset.eligible = "false";
+      }else if(!prereqData.eligible){
+        statusMsg += ` · Nota insuficiente en Fundamentos de Investigación (${prereqData.grade})`;
+        statusClass = "notfound";
+        row.dataset.eligible = "false";
+      }else{
+        statusMsg += ` · Cumple Fundamentos de Investigación (${prereqData.grade})`;
+        row.dataset.eligible = "true";
+      }
+
+      tag.textContent = statusMsg;
+      tag.className = "autofill-tag " + statusClass;
     }catch(e){
       tag.textContent = "No se pudo consultar la base de datos";
       tag.className = "autofill-tag notfound";
@@ -863,16 +973,31 @@ async function renderAdmin(){
 }
 
 function professorsToText(list){
-  return list.map(p=>`${p.name} | ${p.area} | ${p.quota}`).join("\n");
+  return list.map(p=>`${p.name} | ${p.area} | ${p.quota} | ${p.pin||""}`).join("\n");
 }
-function parseProfessorsText(text){
+// existingList: los profesores ya cargados (con su id real) para preservar el id de cada
+// uno si el nombre coincide — así no se rompe el vínculo con sus inscripciones o su clave
+// de acceso cada vez que el admin vuelve a guardar el listado.
+function parseProfessorsText(text, existingList){
   const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
-  return lines.map((line, idx)=>{
+  const existingByName = {};
+  (existingList||[]).forEach(p=>{ existingByName[(p.name||"").trim().toLowerCase()] = p; });
+  let maxNum = 0;
+  (existingList||[]).forEach(p=>{
+    const m = /^p(\d+)$/.exec(p.id||"");
+    if(m) maxNum = Math.max(maxNum, parseInt(m[1],10));
+  });
+  return lines.map((line)=>{
     const parts = line.split("|").map(p=>p.trim());
-    const name = parts[0] || `Profesor ${idx+1}`;
+    const name = parts[0] || "";
     const area = parts[1] || "";
     const quota = parseInt(parts[2],10);
-    return { id: "p"+(idx+1), name, area, quota: isNaN(quota)?0:quota };
+    const pin = parts[3] || "";
+    const match = existingByName[name.toLowerCase()];
+    let id;
+    if(match){ id = match.id; }
+    else{ maxNum++; id = "p"+maxNum; }
+    return { id, name, area, quota: isNaN(quota)?0:quota, pin };
   });
 }
 function parseStudentsText(text){
@@ -882,6 +1007,28 @@ function parseStudentsText(text){
     return { cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", email: parts[3]||"" };
   }).filter(s=>s.cedula);
 }
+function parsePrereqText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  return lines.map(line=>{
+    const parts = line.split("|").map(p=>p.trim());
+    // acepta coma o punto como separador decimal
+    const gradeRaw = (parts[3]||"").replace(",", ".");
+    const grade = parseFloat(gradeRaw);
+    return { cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", grade: isNaN(grade)?null:grade };
+  }).filter(s=>s.cedula && s.grade!==null);
+}
+function studentRecordsToText(list){
+  return list.map(r=>`${r.cedula} | ${r.codigo||""} | ${r.nombre||""} | ${r.correo||""}`).join("\n");
+}
+function prereqRecordsToText(list){
+  return list.map(r=>`${r.cedula} | ${r.codigo||""} | ${r.nombre||""} | ${r.nota}`).join("\n");
+}
+function loadStudentSample(){
+  document.getElementById("studentTextarea").value = studentRecordsToText(studentDBRaw);
+}
+function loadPrereqSample(){
+  document.getElementById("prereqTextarea").value = prereqRecordsToText(prereqDBRaw);
+}
 
 function renderSabana(){
   const wrap = document.getElementById("sabanaTableWrap");
@@ -889,16 +1036,26 @@ function renderSabana(){
   const totalStudents = enrollments.reduce((a,e)=>a+e.students.length,0);
   summary.textContent = `${enrollments.length} grupos · ${totalStudents} estudiantes registrados en total.`;
 
+  mergeSelection.clear();
+
   if(enrollments.length===0){
     wrap.innerHTML = `<div class="empty-state">Todavía no hay inscripciones.</div>`;
+    document.getElementById("mergeBar").style.display = "none";
     return;
   }
+  document.getElementById("mergeBar").style.display = "flex";
+  updateMergeBar();
+
+  const profOptions = professors.slice().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(p=>`<option value="${p.id}">${escapeHTML(p.name)}</option>`).join("");
+  document.getElementById("mergeProfSelect").innerHTML = `<option value="">Elige asesor…</option>` + profOptions;
 
   let rows = "";
   enrollments.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
   .forEach(e=>{
     e.students.forEach((s,idx)=>{
       rows += `<tr>
+        ${idx===0?`<td rowspan="${e.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(e.id)}" onchange="onGroupCheckChange(this, mergeSelection, 'mergeCount', 'mergeBtn')"></td>`:""}
         <td>${idx===0?escapeHTML(e.groupCode||"—"):""}</td>
         <td>${idx===0?escapeHTML(e.profName):""}</td>
         <td>${idx===0?escapeHTML(e.groupTitle||"—"):""}</td>
@@ -915,7 +1072,7 @@ function renderSabana(){
   wrap.innerHTML = `
     <table>
       <thead>
-        <tr><th>Código grupo</th><th>Profesor</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha inscripción</th><th></th></tr>
+        <tr><th title="Selecciona el grupo completo">Grupo</th><th>Código grupo</th><th>Profesor</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha inscripción</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -933,9 +1090,246 @@ async function deleteEnrollment(id){
   }
 }
 
+/* =========================================================
+   RECOMPONER GRUPOS (combinar grupos/estudiantes ya inscritos)
+   ---------------------------------------------------------
+   La casilla siempre selecciona un GRUPO COMPLETO (con rowspan
+   sobre todas sus filas) — nunca un estudiante suelto dentro de
+   un grupo de varios, para que no sea posible partir un grupo
+   existente. groupsSource es la lista de grupos vigente (enrollments
+   para el admin, profGroupsData para el panel de profesor).
+========================================================= */
+function onGroupCheckChange(checkbox, selectionMap, countElId, btnElId){
+  const groupId = checkbox.dataset.group;
+  const groupsSource = (selectionMap === mergeSelection) ? enrollments : profGroupsData;
+  const group = groupsSource.find(g=>g.id===groupId);
+  if(!group) return;
+
+  if(checkbox.checked){
+    const currentTotal = Array.from(selectionMap.values()).reduce((a,g)=>a+g.students.length, 0);
+    if(currentTotal + group.students.length > MAX_GROUP_SIZE){
+      checkbox.checked = false;
+      alert(`No puedes combinar más de ${MAX_GROUP_SIZE} estudiantes en un grupo. Este grupo tiene ${group.students.length} integrante(s) y ya llevas ${currentTotal} seleccionado(s).`);
+      return;
+    }
+    selectionMap.set(groupId, {
+      groupId: group.id,
+      profId: group.profId,
+      profName: group.profName,
+      students: group.students.map(s=>({ cedula:s.cedula, code:s.code, name:s.name }))
+    });
+  }else{
+    selectionMap.delete(groupId);
+  }
+  const totalStudents = Array.from(selectionMap.values()).reduce((a,g)=>a+g.students.length,0);
+  document.getElementById(countElId).textContent = `${totalStudents} estudiante${totalStudents===1?"":"s"} seleccionado${totalStudents===1?"":"s"} en ${selectionMap.size} grupo${selectionMap.size===1?"":"s"} (máximo ${MAX_GROUP_SIZE})`;
+  document.getElementById(btnElId).disabled = totalStudents < 1;
+}
+
+function updateMergeBar(){
+  const totalStudents = Array.from(mergeSelection.values()).reduce((a,g)=>a+g.students.length,0);
+  document.getElementById("mergeCount").textContent = `${totalStudents} estudiante${totalStudents===1?"":"s"} seleccionado${totalStudents===1?"":"s"} en ${mergeSelection.size} grupo${mergeSelection.size===1?"":"s"} (máximo ${MAX_GROUP_SIZE})`;
+  document.getElementById("mergeBtn").disabled = totalStudents < 1;
+}
+
+async function combineSelectedStudents(){
+  const allStudents = [];
+  mergeSelection.forEach(g=> g.students.forEach(s=> allStudents.push({ groupId:g.groupId, cedula:s.cedula, code:s.code, name:s.name })));
+  if(allStudents.length < 1){
+    alert("Selecciona al menos un grupo de la sábana.");
+    return;
+  }
+  const targetProfId = document.getElementById("mergeProfSelect").value;
+  if(!targetProfId){
+    alert("Elige el profesor para el grupo combinado.");
+    return;
+  }
+  const title = document.getElementById("mergeTitleInput").value.trim();
+  if(!title){
+    alert("Escribe el título de la propuesta para el grupo combinado.");
+    return;
+  }
+  const titleWords = title.split(/\s+/).filter(Boolean).length;
+  if(titleWords > 30){
+    alert(`El título supera las 30 palabras (tiene ${titleWords}).`);
+    return;
+  }
+
+  const names = allStudents.map(s=>s.name || s.cedula || s.code).join(", ");
+  const profName = document.getElementById("mergeProfSelect").selectedOptions[0].textContent;
+  if(!confirm(`¿Combinar a ${names} en un nuevo grupo con ${profName}? Esto los saca de sus inscripciones actuales.`)) return;
+
+  const btn = document.getElementById("mergeBtn");
+  btn.disabled = true;
+  btn.textContent = "Combinando…";
+
+  try{
+    const result = await apiPost({
+      action: "adminMergeStudents",
+      key: ADMIN_KEY,
+      students: allStudents.map(s=>({ groupId:s.groupId, cedula:s.cedula, code:s.code })),
+      targetProfId,
+      groupTitle: title
+    });
+    if(result.error){ alert("Error: "+result.error); return; }
+    alert(`Grupo combinado con éxito. Código de grupo: ${result.groupCode}. Cupos restantes de ${result.profName}: ${result.remaining}.`);
+    document.getElementById("mergeTitleInput").value = "";
+    document.getElementById("mergeProfSelect").value = "";
+    await renderAdmin();
+  }catch(e){
+    alert("No se pudo combinar el grupo. Intenta de nuevo.");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "Combinar en un grupo";
+  }
+}
+
+/* =========================================================
+   PANEL PROFESOR
+========================================================= */
+function populateProfLoginSelect(){
+  const sel = document.getElementById("profLoginSelect");
+  if(!sel) return;
+  const options = professors.slice().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(p=>`<option value="${p.id}">${escapeHTML(p.name)}</option>`).join("");
+  sel.innerHTML = `<option value="">Selecciona tu nombre…</option>` + options;
+}
+
+async function tryProfLogin(){
+  const profId = document.getElementById("profLoginSelect").value;
+  const pin = document.getElementById("profLoginPass").value.trim();
+  const msgEl = document.getElementById("profLoginMsg");
+  msgEl.innerHTML = "";
+  if(!profId){ msgEl.innerHTML = `<div class="msg error">Selecciona tu nombre en la lista.</div>`; return; }
+  if(!pin){ msgEl.innerHTML = `<div class="msg error">Escribe tu clave.</div>`; return; }
+
+  try{
+    const data = await apiGet({ action:"profData", profId, pin });
+    if(!data.ok){
+      msgEl.innerHTML = `<div class="msg error">${escapeHTML(data.error||"No se pudo validar el acceso.")}</div>`;
+      return;
+    }
+    profSession = { profId: data.profId, pin, profName: data.profName };
+    document.getElementById("profLoginPass").value = "";
+    switchView("prof");
+    renderProfPanel(data);
+  }catch(e){
+    msgEl.innerHTML = `<div class="msg error">No se pudo conectar con el servidor. Intenta de nuevo.</div>`;
+  }
+}
+
+function logoutProf(){
+  profSession = null;
+  profGroupsData = [];
+  profMergeSelection.clear();
+  document.getElementById("profLoginPass").value = "";
+  switchView("public");
+}
+
+function renderProfPanel(data){
+  document.getElementById("profPanelTitle").textContent = `Mis grupos — ${data.profName}`;
+  document.getElementById("profQuotaSummary").textContent = `Cupos: ${data.remaining} disponibles de ${data.quota} en total.`;
+  profGroupsData = data.groups || [];
+  renderProfTable();
+}
+
+async function refreshProfPanel(){
+  try{
+    const data = await apiGet({ action:"profData", profId: profSession.profId, pin: profSession.pin });
+    if(!data.ok){ alert("Tu sesión ya no es válida. Vuelve a iniciar sesión."); logoutProf(); return; }
+    renderProfPanel(data);
+  }catch(e){
+    alert("No se pudo actualizar el panel. Intenta de nuevo.");
+  }
+}
+
+function renderProfTable(){
+  const wrap = document.getElementById("profTableWrap");
+  profMergeSelection.clear();
+
+  if(profGroupsData.length===0){
+    wrap.innerHTML = `<div class="empty-state">Todavía no tienes grupos asignados.</div>`;
+    document.getElementById("profMergeBar").style.display = "none";
+    return;
+  }
+  document.getElementById("profMergeBar").style.display = "flex";
+  document.getElementById("profMergeCount").textContent = `0 estudiantes seleccionados en 0 grupos (máximo ${MAX_GROUP_SIZE})`;
+  document.getElementById("profMergeBtn").disabled = true;
+
+  let rows = "";
+  profGroupsData.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
+  .forEach(g=>{
+    g.students.forEach((s,idx)=>{
+      rows += `<tr>
+        ${idx===0?`<td rowspan="${g.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(g.id)}" onchange="onGroupCheckChange(this, profMergeSelection, 'profMergeCount', 'profMergeBtn')"></td>`:""}
+        <td>${idx===0?escapeHTML(g.groupCode||"—"):""}</td>
+        <td>${idx===0?escapeHTML(g.groupTitle||"—"):""}</td>
+        <td>${escapeHTML(s.name)}</td>
+        <td>${escapeHTML(s.code)}</td>
+        <td>${escapeHTML(s.cedula)}</td>
+        <td>${escapeHTML(s.email)}</td>
+      </tr>`;
+    });
+  });
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr><th title="Selecciona el grupo completo">Grupo</th><th>Código grupo</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function combineProfGroups(){
+  const allStudents = [];
+  profMergeSelection.forEach(g=> g.students.forEach(s=> allStudents.push({ groupId:g.groupId, cedula:s.cedula, code:s.code, name:s.name })));
+  if(allStudents.length < 1){
+    alert("Selecciona al menos un grupo tuyo.");
+    return;
+  }
+  const title = document.getElementById("profMergeTitleInput").value.trim();
+  if(!title){
+    alert("Escribe el título de la propuesta para el grupo combinado.");
+    return;
+  }
+  const titleWords = title.split(/\s+/).filter(Boolean).length;
+  if(titleWords > 30){
+    alert(`El título supera las 30 palabras (tiene ${titleWords}).`);
+    return;
+  }
+
+  const names = allStudents.map(s=>s.name || s.cedula || s.code).join(", ");
+  if(!confirm(`¿Combinar a ${names} en un nuevo grupo contigo como asesor?`)) return;
+
+  const btn = document.getElementById("profMergeBtn");
+  btn.disabled = true;
+  btn.textContent = "Combinando…";
+
+  try{
+    const result = await apiPost({
+      action: "profMergeStudents",
+      profId: profSession.profId,
+      pin: profSession.pin,
+      students: allStudents.map(s=>({ groupId:s.groupId, cedula:s.cedula, code:s.code })),
+      groupTitle: title
+    });
+    if(result.error){ alert("Error: "+result.error); return; }
+    alert(`Grupo combinado con éxito. Código de grupo: ${result.groupCode}.`);
+    document.getElementById("profMergeTitleInput").value = "";
+    await refreshProfPanel();
+  }catch(e){
+    alert("No se pudo combinar el grupo. Intenta de nuevo.");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "Combinar en un grupo";
+  }
+}
+
 async function saveProfessorsFromText(){
   const text = document.getElementById("profTextarea").value;
-  const parsed = parseProfessorsText(text);
+  const parsed = parseProfessorsText(text, professors);
   if(parsed.length===0){
     alert("El listado está vacío.");
     return;
@@ -969,6 +1363,28 @@ async function saveStudentsFromText(){
     alert(`Base de estudiantes actualizada. ${result.updated} registros procesados. Total en base: ${result.total}.`);
   }catch(e){
     alert("No se pudo guardar la base de estudiantes. Si es un archivo grande, pégalo en bloques más pequeños.");
+  }
+}
+
+async function savePrereqFromText(){
+  const text = document.getElementById("prereqTextarea").value.trim();
+  if(!text){
+    alert("Pega el listado de Fundamentos de Investigación primero (una línea por estudiante).");
+    return;
+  }
+  const parsed = parsePrereqText(text);
+  if(parsed.length===0){
+    alert("No se reconoció ningún registro válido. Revisa el formato: Cédula | ID | Nombre | Nota (la nota debe ser un número).");
+    return;
+  }
+  try{
+    const result = await apiPost({ action:"adminSavePrereq", key: ADMIN_KEY, records: parsed });
+    if(result.error){ alert("Error: "+result.error); return; }
+    document.getElementById("prereqDbCount").textContent = result.total;
+    document.getElementById("prereqTextarea").value = "";
+    alert(`Base de Fundamentos de Investigación actualizada. ${result.updated} registros procesados. Total en base: ${result.total}.`);
+  }catch(e){
+    alert("No se pudo guardar la base. Si es un archivo grande, pégalo en bloques más pequeños.");
   }
 }
 
@@ -1035,6 +1451,13 @@ function switchView(name){
   if(name==="public"){
     document.getElementById("view-public").classList.add("active");
     document.getElementById("tabPublic").classList.add("active");
+  }else if(name==="profGate"){
+    if(profSession){ switchView("prof"); return; }
+    document.getElementById("view-profGate").classList.add("active");
+    document.getElementById("tabProf").classList.add("active");
+  }else if(name==="prof"){
+    document.getElementById("view-prof").classList.add("active");
+    document.getElementById("tabProf").classList.add("active");
   }else if(name==="adminGate"){
     if(isAdmin){ switchView("admin"); return; }
     document.getElementById("view-adminGate").classList.add("active");
