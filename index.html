@@ -444,7 +444,7 @@
         <li>Escribe el título de la propuesta de grado (máximo 30 palabras).</li>
         <li>Confirma la inscripción. Te aparecerá un código de grupo — guárdalo como comprobante.</li>
       </ol>
-      <p class="small-note" style="margin-top:6px;">Cada persona solo puede aparecer en un grupo. Si ya estás inscrito en otro grupo, el sistema te lo indicará y no dejará continuar. Además, todos los integrantes deben haber aprobado Fundamentos de Investigación con nota igual o superior a 3.5.</p>
+      <p class="small-note" style="margin-top:6px;">Cada persona solo puede aparecer en un grupo. Si ya estás inscrito en otro grupo, el sistema te lo indicará y no dejará continuar.</p>
     </div>
 
     <div class="status-bar sans" id="statusBar"></div>
@@ -836,7 +836,10 @@ function onIdentifierInput(input){
         row.dataset.manual = "true";
       }
 
-      if(!prereqData.found){
+      if(prereqData.enforced === false){
+        // el prerrequisito está desactivado por ahora — no se muestra ningún aviso al respecto
+        row.dataset.eligible = "true";
+      }else if(!prereqData.found){
         statusMsg += " · No registra Fundamentos de Investigación";
         statusClass = "notfound";
         row.dataset.eligible = "false";
