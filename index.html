@@ -9,13 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#1c2530;
-    --ink-soft:#4a5568;
-    --paper:#f7f6f3;
+    --ink:#262421;
+    --ink-soft:#5c574d;
+    --paper:#f7f5ef;
     --card:#ffffff;
-    --line:#e2e0da;
-    --accent:#2f5d50;
-    --accent-soft:#e8efec;
+    --line:#e5e0d3;
+    --accent:#b8912e;
+    --accent-soft:#f6ecd3;
+    --charcoal:#242322;
+    --charcoal-soft:#3a3835;
     --warn:#a5490f;
     --warn-soft:#fbeee4;
     --danger:#a3242a;
@@ -33,26 +35,27 @@
   }
   .sans{ font-family: var(--font); }
   header.top{
-    border-bottom:1px solid var(--line);
-    background:var(--card);
-    padding:22px 24px;
+    background:var(--charcoal);
+    padding:26px 28px;
     display:flex;
     justify-content:space-between;
     align-items:center;
     flex-wrap:wrap;
     gap:10px;
+    border-bottom:3px solid var(--accent);
   }
   header.top h1{
-    font-size:1.35rem;
+    font-size:1.4rem;
     margin:0;
-    font-weight:700;
-    letter-spacing:0.1px;
+    font-weight:800;
+    letter-spacing:0.2px;
+    color:#ffffff;
   }
   header.top p{
-    margin:2px 0 0;
+    margin:4px 0 0;
     font-family: var(--font);
     font-size:0.82rem;
-    color:var(--ink-soft);
+    color:#c9c6bf;
   }
   nav.tabs{
     display:flex;
@@ -60,9 +63,9 @@
     font-family: var(--font);
   }
   nav.tabs button{
-    border:1px solid var(--line);
-    background:var(--card);
-    color:var(--ink-soft);
+    border:1px solid var(--charcoal-soft);
+    background:transparent;
+    color:#e6e3da;
     padding:8px 14px;
     border-radius:7px;
     font-size:0.85rem;
@@ -71,7 +74,8 @@
   nav.tabs button.active{
     background:var(--accent);
     border-color:var(--accent);
-    color:#fff;
+    color:var(--charcoal);
+    font-weight:700;
   }
   main{
     max-width:1080px;
@@ -93,19 +97,24 @@
   .status-bar strong{ color:var(--ink); }
 
   .prof-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
-    gap:14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
     margin-bottom:34px;
   }
   .prof-card{
     background:var(--card);
     border:1px solid var(--line);
-    border-radius:10px;
-    padding:16px 16px 14px;
+    border-radius:12px;
+    padding:20px 22px;
     cursor:pointer;
-    transition:border-color .15s, transform .1s;
+    transition:border-color .15s, box-shadow .15s;
     position:relative;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    flex-wrap:wrap;
   }
   .prof-card:hover{ border-color:var(--accent); }
   .prof-card.selected{
@@ -117,29 +126,49 @@
     cursor:not-allowed;
   }
   .prof-card.full:hover{ border-color:var(--line); }
-  .prof-name{
-    font-size:1.02rem;
-    font-weight:700;
-    margin:0 0 4px;
+  .prof-main{
+    flex:1;
+    min-width:240px;
   }
-  .prof-area{
+  .prof-name{
+    font-size:1.25rem;
+    font-weight:700;
+    margin:0 0 10px;
+    letter-spacing:0.1px;
+  }
+  .prof-areas{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+  }
+  .area-tag{
     font-family: var(--font);
-    font-size:0.8rem;
+    font-size:0.76rem;
+    font-weight:600;
+    color:var(--accent);
+    background:var(--accent-soft);
+    border-radius:20px;
+    padding:4px 12px;
+    white-space:nowrap;
+  }
+  .prof-card.full .area-tag{
     color:var(--ink-soft);
-    margin:0 0 12px;
-    min-height:2.4em;
+    background:var(--paper);
   }
   .prof-quota{
     font-family: var(--font);
     font-size:0.78rem;
     display:flex;
-    align-items:center;
-    justify-content:space-between;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:6px;
+    white-space:nowrap;
   }
   .quota-pill{
-    padding:2px 9px;
+    padding:4px 12px;
     border-radius:20px;
-    font-weight:600;
+    font-weight:700;
+    font-size:0.85rem;
     background:var(--accent-soft);
     color:var(--accent);
   }
@@ -211,12 +240,12 @@
   button.primary{
     font-family: var(--font);
     background:var(--accent);
-    color:#fff;
+    color:var(--charcoal);
     border:none;
     padding:11px 20px;
     border-radius:8px;
     font-size:0.92rem;
-    font-weight:600;
+    font-weight:700;
     cursor:pointer;
   }
   button.primary:disabled{
@@ -582,9 +611,14 @@ function renderProfGrid(){
     let pillClass = "";
     if(full) pillClass="zero";
     else if(rem <= Math.max(1, Math.ceil((p.quota||1)*0.25))) pillClass="low";
+    // Un profesor puede tener varias áreas separadas por coma; cada una se muestra como tag.
+    const areaTags = String(p.area||"").split(",").map(a=>a.trim()).filter(Boolean)
+      .map(a=>`<span class="area-tag">${escapeHTML(a)}</span>`).join("");
     card.innerHTML = `
-      <p class="prof-name">${escapeHTML(p.name)}</p>
-      <p class="prof-area">${escapeHTML(p.area)}</p>
+      <div class="prof-main">
+        <p class="prof-name">${escapeHTML(p.name)}</p>
+        <div class="prof-areas">${areaTags}</div>
+      </div>
       <div class="prof-quota">
         <span>${full?"Sin cupo":"Disponible"}</span>
         <span class="quota-pill ${pillClass}">${rem} / ${p.quota}</span>
