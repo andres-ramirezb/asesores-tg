@@ -192,7 +192,7 @@
   }
   .student-row{
     display:grid;
-    grid-template-columns:1fr 1fr 1fr auto;
+    grid-template-columns:1fr 1fr 1.3fr 1.3fr auto;
     gap:10px;
     align-items:end;
     margin-bottom:12px;
@@ -342,6 +342,26 @@
     font-family: var(--font);
     font-size:0.85rem;
   }
+  .instructivo{
+    background:var(--accent-soft);
+    border-color:transparent;
+  }
+  .instructivo h2{
+    font-weight:700;
+    font-size:1.05rem;
+    margin-bottom:10px;
+  }
+  .instructivo ol{
+    margin:0;
+    padding-left:20px;
+    font-size:0.85rem;
+    color:var(--ink);
+  }
+  .instructivo li{
+    margin-bottom:6px;
+    line-height:1.5;
+  }
+  .instructivo li:last-child{ margin-bottom:0; }
 </style>
 </head>
 <body>
@@ -362,6 +382,19 @@
   <!-- ===================== VISTA PÚBLICA ===================== -->
   <section id="view-public" class="view active">
 
+    <div class="panel instructivo sans" id="instructivoPanel">
+      <h2>Cómo inscribirte</h2>
+      <ol>
+        <li>Revisa el listado de profesores y sus áreas temáticas. El número que aparece en cada tarjeta indica los cupos que le quedan.</li>
+        <li>Haz clic en el profesor que quieres como asesor (solo se puede si tiene cupo disponible).</li>
+        <li>Un solo representante del grupo diligencia el formulario por todos los integrantes (entre 1 y 3 personas).</li>
+        <li>Para cada integrante, escribe su <strong>ID</strong> o su <strong>cédula</strong> (con que escribas uno de los dos basta) — el nombre y el correo se completan automáticamente si la persona ya está en la base de datos. Si no aparece, completa los datos manualmente.</li>
+        <li>Escribe el título de la propuesta de grado (máximo 30 palabras).</li>
+        <li>Confirma la inscripción. Te aparecerá un código de grupo — guárdalo como comprobante.</li>
+      </ol>
+      <p class="small-note" style="margin-top:6px;">Cada persona solo puede aparecer en un grupo. Si ya estás inscrito en otro grupo, el sistema te lo indicará y no dejará continuar.</p>
+    </div>
+
     <div class="status-bar sans" id="statusBar"></div>
 
     <div id="profGrid" class="prof-grid"></div>
@@ -371,8 +404,14 @@
       <p class="small-note" id="formSubtitle"></p>
 
       <h3>Integrantes del grupo (1 a 3 estudiantes)</h3>
+      <p class="small-note">Escribe el ID o la cédula de cada integrante — el resto se autocompleta si la persona está en la base de datos.</p>
       <div id="studentRows"></div>
       <button class="secondary" id="addStudentBtn" onclick="addStudentRow()">+ Agregar integrante</button>
+
+      <h3>Título de la propuesta de grado</h3>
+      <label for="groupTitleInput">Máximo 30 palabras</label>
+      <input type="text" id="groupTitleInput" placeholder="Escribe el título de la propuesta" oninput="updateTitleCounter()">
+      <p class="small-note" id="titleCounter">0 / 30 palabras</p>
 
       <div style="margin-top:22px; display:flex; gap:10px; align-items:center;">
         <button class="primary" onclick="submitGroup()">Confirmar inscripción</button>
@@ -425,8 +464,8 @@
 
       <div class="panel">
         <h2>Base de estudiantes</h2>
-        <p class="small-note">Formato: una línea por estudiante → <code>Cédula | Nombre completo | ID/Código</code>. Se usa para autocompletar el formulario público al escribir la cédula. Base actual: <strong id="studentDbCount">0</strong> estudiantes.</p>
-        <textarea id="studentTextarea" placeholder="1000123456 | Juana Pérez Gómez | EST-0231"></textarea>
+        <p class="small-note">Formato: una línea por estudiante → <code>Cédula | ID/Código | Nombre completo | Correo electrónico</code>. Se usa para autocompletar el formulario público al escribir la cédula o el ID. Base actual: <strong id="studentDbCount">0</strong> estudiantes.</p>
+        <textarea id="studentTextarea" placeholder="1000123456 | EST-0231 | Juana Pérez Gómez | juana.perez@correo.edu.co"></textarea>
         <div style="margin-top:10px; display:flex; gap:10px;">
           <button class="primary" onclick="saveStudentsFromText()">Guardar base de estudiantes</button>
           <button class="secondary" onclick="loadStudentSample()">Ver muestra actual</button>
@@ -452,7 +491,7 @@
    (termina en /exec). La consigues después de "Implementar >
    Nueva implementación > Aplicación web".
 ========================================================= */
-const API_URL = "https://script.google.com/macros/s/AKfycbwu5jn8Dx1CUmbI2b7FmC3kWBksV80qT6Dzm1kBaEIKi1998b_uzG-vMsPjc3KDN-Di/exec";
+const API_URL = "PEGAR_AQUI_LA_URL_DE_APPS_SCRIPThttps://script.google.com/macros/s/AKfycbwu5jn8Dx1CUmbI2b7FmC3kWBksV80qT6Dzm1kBaEIKi1998b_uzG-vMsPjc3KDN-Di/exec";
 const ADMIN_KEY = "6NXQpPJDOmFqASlb"; // debe coincidir con ADMIN_KEY en Code.gs
 const MAX_GROUP_SIZE = 3;
 
@@ -567,6 +606,8 @@ function selectProfessor(profId){
   document.getElementById("formSubtitle").textContent = `Área: ${prof.area} · Cupos disponibles: ${remainingQuotaPublic(prof)}`;
   document.getElementById("studentRows").innerHTML = "";
   addStudentRow();
+  document.getElementById("groupTitleInput").value = "";
+  updateTitleCounter();
   document.getElementById("formMsg").innerHTML = "";
   document.getElementById("formPanel").scrollIntoView({behavior:"smooth", block:"start"});
 }
@@ -588,8 +629,12 @@ function addStudentRow(){
   div.dataset.rowid = rowId;
   div.innerHTML = `
     <div>
+      <label>ID</label>
+      <input type="text" class="code-input" placeholder="Ej: EST-1001" oninput="onIdentifierInput(this)">
+    </div>
+    <div>
       <label>Cédula</label>
-      <input type="text" class="ced-input" placeholder="Ej: 1000100001" oninput="onCedulaInput(this)">
+      <input type="text" class="ced-input" placeholder="Ej: 1000100001" oninput="onIdentifierInput(this)">
       <div class="autofill-tag" data-tag></div>
     </div>
     <div>
@@ -597,8 +642,8 @@ function addStudentRow(){
       <input type="text" class="name-input" placeholder="Se autocompleta o escríbelo">
     </div>
     <div>
-      <label>ID / Código</label>
-      <input type="text" class="code-input" placeholder="Se autocompleta o escríbelo">
+      <label>Correo electrónico</label>
+      <input type="text" class="email-input" placeholder="Se autocompleta o escríbelo">
     </div>
     <div>
       <button class="remove-row" onclick="removeStudentRow(this)" title="Quitar integrante">✕</button>
@@ -620,11 +665,15 @@ function updateAddButtonState(){
   document.getElementById("addStudentBtn").style.display = rows.children.length >= MAX_GROUP_SIZE ? "none":"inline-block";
 }
 
-function onCedulaInput(input){
+// Se dispara al escribir en el campo ID o en el campo Cédula (cualquiera de los dos sirve para buscar).
+function onIdentifierInput(input){
   const row = input.closest(".student-row");
   const tag = row.querySelector("[data-tag]");
-  const ced = input.value.trim();
-  if(!ced){ tag.textContent=""; return; }
+  const codeVal = row.querySelector(".code-input").value.trim();
+  const cedVal = row.querySelector(".ced-input").value.trim();
+  const value = input.classList.contains("code-input") ? codeVal : cedVal;
+
+  if(!value){ tag.textContent=""; return; }
 
   tag.textContent = "Buscando…";
   tag.className = "autofill-tag";
@@ -632,14 +681,24 @@ function onCedulaInput(input){
   clearTimeout(cedulaLookupTimer);
   cedulaLookupTimer = setTimeout(async ()=>{
     try{
-      const data = await apiGet({ action:"lookupStudent", cedula: ced });
-      // el usuario pudo seguir escribiendo; solo aplica si la cédula no cambió
-      if(input.value.trim() !== ced) return;
+      const data = await apiGet({ action:"lookupStudent", value: value });
+      // el usuario pudo seguir escribiendo; solo aplica si el valor consultado no cambió
+      const stillCurrent = input.classList.contains("code-input")
+        ? row.querySelector(".code-input").value.trim() === value
+        : row.querySelector(".ced-input").value.trim() === value;
+      if(!stillCurrent) return;
+
       const nameInput = row.querySelector(".name-input");
+      const emailInput = row.querySelector(".email-input");
       const codeInput = row.querySelector(".code-input");
+      const cedInput = row.querySelector(".ced-input");
+
       if(data.found){
         nameInput.value = data.student.name;
-        codeInput.value = data.student.code;
+        emailInput.value = data.student.email;
+        // completa el identificador que faltaba, sin pisar el que la persona ya escribió
+        if(input.classList.contains("code-input") && !cedInput.value.trim()) cedInput.value = data.student.cedula;
+        if(input.classList.contains("ced-input") && !codeInput.value.trim()) codeInput.value = data.student.code;
         tag.textContent = "Encontrado en la base de datos";
         tag.className = "autofill-tag found";
         row.dataset.manual = "false";
@@ -654,6 +713,14 @@ function onCedulaInput(input){
       row.dataset.manual = "true";
     }
   }, 350);
+}
+
+function updateTitleCounter(){
+  const input = document.getElementById("groupTitleInput");
+  const counter = document.getElementById("titleCounter");
+  const words = input.value.trim().split(/\s+/).filter(Boolean).length;
+  counter.textContent = `${words} / 30 palabras`;
+  counter.style.color = words > 30 ? "var(--danger)" : "var(--ink-soft)";
 }
 
 async function submitGroup(){
@@ -673,21 +740,34 @@ async function submitGroup(){
   const students = [];
   for(const row of rows){
     const ced = row.querySelector(".ced-input").value.trim();
-    const name = row.querySelector(".name-input").value.trim();
     const code = row.querySelector(".code-input").value.trim();
-    if(!ced || !name || !code){
-      msgEl.innerHTML = `<div class="msg error">Completa cédula, nombre e ID de todos los integrantes.</div>`;
+    const name = row.querySelector(".name-input").value.trim();
+    const email = row.querySelector(".email-input").value.trim();
+    if((!ced && !code) || !name){
+      msgEl.innerHTML = `<div class="msg error">Completa al menos el ID o la cédula, y el nombre de cada integrante.</div>`;
       return;
     }
-    students.push({ cedula: ced, name, code, manual: row.dataset.manual==="true" });
+    students.push({ cedula: ced, code, name, email, manual: row.dataset.manual==="true" });
   }
   if(students.length<1 || students.length>MAX_GROUP_SIZE){
     msgEl.innerHTML = `<div class="msg error">El grupo debe tener entre 1 y ${MAX_GROUP_SIZE} estudiantes.</div>`;
     return;
   }
-  const ceds = students.map(s=>s.cedula);
-  if(new Set(ceds).size !== ceds.length){
-    msgEl.innerHTML = `<div class="msg error">Hay cédulas repetidas dentro del grupo.</div>`;
+  const ceds = students.map(s=>s.cedula).filter(Boolean);
+  const codes = students.map(s=>s.code).filter(Boolean);
+  if(new Set(ceds).size !== ceds.length || new Set(codes).size !== codes.length){
+    msgEl.innerHTML = `<div class="msg error">Hay integrantes repetidos dentro del grupo.</div>`;
+    return;
+  }
+
+  const groupTitle = document.getElementById("groupTitleInput").value.trim();
+  const titleWords = groupTitle.split(/\s+/).filter(Boolean).length;
+  if(!groupTitle){
+    msgEl.innerHTML = `<div class="msg error">Escribe el título de la propuesta de grado.</div>`;
+    return;
+  }
+  if(titleWords > 30){
+    msgEl.innerHTML = `<div class="msg error">El título de la propuesta supera las 30 palabras (tiene ${titleWords}).</div>`;
     return;
   }
 
@@ -696,7 +776,7 @@ async function submitGroup(){
   submitBtn.textContent = "Enviando…";
 
   try{
-    const result = await apiPost({ action:"enroll", profId: prof.id, students });
+    const result = await apiPost({ action:"enroll", profId: prof.id, students, groupTitle });
     if(result.error){
       msgEl.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`;
       await loadPublicState();
@@ -765,7 +845,7 @@ function parseStudentsText(text){
   const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
   return lines.map(line=>{
     const parts = line.split("|").map(p=>p.trim());
-    return { cedula: parts[0]||"", name: parts[1]||"", code: parts[2]||"" };
+    return { cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", email: parts[3]||"" };
   }).filter(s=>s.cedula);
 }
 
@@ -787,9 +867,11 @@ function renderSabana(){
       rows += `<tr>
         <td>${idx===0?escapeHTML(e.groupCode||"—"):""}</td>
         <td>${idx===0?escapeHTML(e.profName):""}</td>
+        <td>${idx===0?escapeHTML(e.groupTitle||"—"):""}</td>
         <td>${escapeHTML(s.name)}${s.manual?'<span class="tag-review">Revisar dato</span>':''}</td>
         <td>${escapeHTML(s.code)}</td>
         <td>${escapeHTML(s.cedula)}</td>
+        <td>${escapeHTML(s.email)}</td>
         <td>${idx===0?new Date(e.timestamp).toLocaleString("es-CO"):""}</td>
         <td>${idx===0?`<button class="danger-btn" onclick="deleteEnrollment('${e.id}')">Eliminar grupo</button>`:""}</td>
       </tr>`;
@@ -799,7 +881,7 @@ function renderSabana(){
   wrap.innerHTML = `
     <table>
       <thead>
-        <tr><th>Código grupo</th><th>Profesor</th><th>Nombre estudiante</th><th>ID/Código</th><th>Cédula</th><th>Fecha inscripción</th><th></th></tr>
+        <tr><th>Código grupo</th><th>Profesor</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha inscripción</th><th></th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -872,14 +954,15 @@ function exportCSV(){
     alert("No hay inscripciones para exportar.");
     return;
   }
-  const header = ["Código grupo","Profesor","Área","Nombre estudiante","ID/Código","Cédula","Dato manual (revisar)","Fecha inscripción"];
+  const header = ["Código grupo","Profesor","Área","Título propuesta","Nombre estudiante","ID","Cédula","Correo","Dato manual (revisar)","Fecha inscripción"];
   const lines = [header.join(",")];
   enrollments.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(e=>{
     const prof = professors.find(p=>p.id===e.profId);
     const area = prof ? prof.area : "";
     e.students.forEach(s=>{
       const row = [
-        csvSafe(e.groupCode||""), csvSafe(e.profName), csvSafe(area), csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula),
+        csvSafe(e.groupCode||""), csvSafe(e.profName), csvSafe(area), csvSafe(e.groupTitle||""),
+        csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula), csvSafe(s.email),
         s.manual ? "SI" : "NO", new Date(e.timestamp).toLocaleString("es-CO")
       ];
       lines.push(row.join(","));
