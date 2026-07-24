@@ -34,54 +34,109 @@
     line-height:1.5;
   }
   .sans{ font-family: var(--font); }
-  header.top{
-    background:var(--charcoal);
-    padding:26px 28px;
+
+  .app-shell{
     display:flex;
-    justify-content:space-between;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:10px;
-    border-bottom:3px solid var(--accent);
+    min-height:100vh;
+    align-items:stretch;
   }
-  header.top h1{
-    font-size:1.4rem;
+
+  .sidebar{
+    width:260px;
+    flex-shrink:0;
+    background:var(--charcoal);
+    padding:26px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:28px;
+    position:sticky;
+    top:0;
+    align-self:flex-start;
+    height:100vh;
+    overflow-y:auto;
+  }
+  .sidebar .brand{
+    padding:0 8px;
+  }
+  .sidebar .brand h1{
+    font-size:1.15rem;
     margin:0;
     font-weight:800;
-    letter-spacing:0.2px;
+    letter-spacing:0.1px;
     color:#ffffff;
+    line-height:1.3;
   }
-  header.top p{
+  .sidebar .brand p{
     margin:4px 0 0;
     font-family: var(--font);
-    font-size:0.82rem;
-    color:#c9c6bf;
+    font-size:0.76rem;
+    color:#b8b4a9;
   }
   nav.tabs{
     display:flex;
-    gap:6px;
+    flex-direction:column;
+    gap:3px;
     font-family: var(--font);
   }
   nav.tabs button{
-    border:1px solid var(--charcoal-soft);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border:none;
     background:transparent;
-    color:#e6e3da;
-    padding:8px 14px;
-    border-radius:7px;
-    font-size:0.85rem;
+    color:#d8d5cb;
+    padding:10px 12px;
+    border-radius:9px;
+    font-size:0.87rem;
+    font-family: var(--font);
     cursor:pointer;
+    text-align:left;
+    width:100%;
+    transition:background .12s;
+  }
+  nav.tabs button .nav-icon{
+    width:17px;
+    height:17px;
+    flex-shrink:0;
+    opacity:0.85;
+  }
+  nav.tabs button:hover{
+    background:var(--charcoal-soft);
   }
   nav.tabs button.active{
     background:var(--accent);
-    border-color:var(--accent);
     color:var(--charcoal);
     font-weight:700;
+  }
+  nav.tabs button.active .nav-icon{ opacity:1; }
+  .content-area{
+    flex:1;
+    min-width:0;
   }
   main{
     max-width:1080px;
     margin:0 auto;
-    padding:28px 24px 80px;
+    padding:36px 28px 80px;
   }
+  @media (max-width:860px){
+    .app-shell{ flex-direction:column; }
+    .sidebar{
+      width:100%;
+      height:auto;
+      position:relative;
+      flex-direction:row;
+      align-items:center;
+      justify-content:space-between;
+      padding:16px 18px;
+      gap:14px;
+      overflow-x:auto;
+    }
+    .sidebar .brand p{ display:none; }
+    nav.tabs{ flex-direction:row; gap:6px; }
+    nav.tabs button{ width:auto; white-space:nowrap; }
+    main{ padding:24px 18px 60px; }
+  }
+
   .view{ display:none; }
   .view.active{ display:block; }
 
@@ -104,19 +159,23 @@
   }
   .prof-card{
     background:var(--card);
-    border:1px solid var(--line);
-    border-radius:12px;
-    padding:20px 22px;
+    border:1px solid transparent;
+    border-radius:14px;
+    padding:18px 20px;
     cursor:pointer;
-    transition:border-color .15s, box-shadow .15s;
+    transition:box-shadow .15s, transform .1s;
     position:relative;
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:20px;
+    gap:18px;
     flex-wrap:wrap;
+    box-shadow:0 1px 2px rgba(36,35,34,0.06), 0 1px 8px rgba(36,35,34,0.04);
   }
-  .prof-card:hover{ border-color:var(--accent); }
+  .prof-card:hover{
+    box-shadow:0 4px 14px rgba(36,35,34,0.10), 0 1px 3px rgba(36,35,34,0.06);
+    transform:translateY(-1px);
+  }
   .prof-card.selected{
     border-color:var(--accent);
     box-shadow:0 0 0 2px var(--accent-soft);
@@ -125,15 +184,37 @@
     opacity:0.55;
     cursor:not-allowed;
   }
-  .prof-card.full:hover{ border-color:var(--line); }
-  .prof-main{
+  .prof-card.full:hover{ box-shadow:0 1px 2px rgba(36,35,34,0.06), 0 1px 8px rgba(36,35,34,0.04); transform:none; }
+  .prof-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
     flex:1;
     min-width:240px;
   }
+  .avatar-circle{
+    width:42px;
+    height:42px;
+    border-radius:50%;
+    background:var(--accent-soft);
+    color:var(--accent);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    font-size:0.9rem;
+    flex-shrink:0;
+    font-family: var(--font);
+  }
+  .prof-card.full .avatar-circle{ background:var(--paper); color:var(--ink-soft); }
+  .prof-main{
+    flex:1;
+    min-width:180px;
+  }
   .prof-name{
-    font-size:1.25rem;
+    font-size:1.1rem;
     font-weight:700;
-    margin:0 0 10px;
+    margin:0 0 8px;
     letter-spacing:0.1px;
   }
   .prof-areas{
@@ -177,8 +258,9 @@
 
   .panel{
     background:var(--card);
-    border:1px solid var(--line);
-    border-radius:12px;
+    border:1px solid transparent;
+    box-shadow:0 1px 2px rgba(36,35,34,0.05), 0 1px 8px rgba(36,35,34,0.04);
+    border-radius:14px;
     padding:24px;
     margin-bottom:24px;
   }
@@ -242,11 +324,15 @@
     background:var(--accent);
     color:var(--charcoal);
     border:none;
-    padding:11px 20px;
-    border-radius:8px;
+    padding:11px 22px;
+    border-radius:999px;
     font-size:0.92rem;
     font-weight:700;
     cursor:pointer;
+    transition:box-shadow .12s, transform .08s;
+  }
+  button.primary:hover:not(:disabled){
+    box-shadow:0 2px 8px rgba(184,145,46,0.35);
   }
   button.primary:disabled{
     background:#b7b3a9;
@@ -257,8 +343,8 @@
     background:#fff;
     color:var(--ink);
     border:1px solid var(--line);
-    padding:9px 16px;
-    border-radius:8px;
+    padding:9px 18px;
+    border-radius:999px;
     font-size:0.85rem;
     cursor:pointer;
   }
@@ -301,18 +387,19 @@
   }
   th, td{
     text-align:left;
-    padding:9px 10px;
-    border-bottom:1px solid var(--line);
+    padding:11px 12px;
+    border-bottom:1px solid #efece3;
     vertical-align:top;
   }
   th{
     color:var(--ink-soft);
     font-weight:600;
-    font-size:0.74rem;
+    font-size:0.72rem;
     text-transform:uppercase;
-    letter-spacing:0.04em;
+    letter-spacing:0.05em;
+    border-bottom:1px solid var(--line);
   }
-  tr:hover td{ background:#faf9f6; }
+  tr:hover td{ background:var(--accent-soft); }
   .tag-review{
     display:inline-block;
     background:var(--warn-soft);
@@ -327,8 +414,9 @@
     max-width:360px;
     margin:60px auto;
     background:var(--card);
-    border:1px solid var(--line);
-    border-radius:12px;
+    border:1px solid transparent;
+    box-shadow:0 2px 4px rgba(36,35,34,0.06), 0 4px 16px rgba(36,35,34,0.06);
+    border-radius:14px;
     padding:28px;
   }
   .login-box h2{ margin-top:0; }
@@ -361,6 +449,27 @@
     width:16px;
     height:16px;
     cursor:pointer;
+  }
+  .filter-toggle{
+    display:flex;
+    gap:6px;
+    margin:10px 0;
+  }
+  .filter-toggle button{
+    font-family: var(--font);
+    background:#fff;
+    border:1px solid var(--line);
+    color:var(--ink-soft);
+    padding:6px 16px;
+    border-radius:999px;
+    font-size:0.8rem;
+    cursor:pointer;
+  }
+  .filter-toggle button.active{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:var(--charcoal);
+    font-weight:700;
   }
   .small-note{
     font-family: var(--font);
@@ -417,18 +526,29 @@
 </head>
 <body>
 
-<header class="top">
-  <div>
-    <h1>Asignación de Asesores de Trabajo de Grado</h1>
-    <p class="sans" id="subtitle">Elige tu profesor asesor y registra tu grupo</p>
-  </div>
-  <nav class="tabs">
-    <button id="tabPublic" class="active" onclick="switchView('public')">Inscripción</button>
-    <button id="tabProf" onclick="switchView('profGate')">Acceso profesores</button>
-    <button id="tabAdmin" onclick="switchView('adminGate')">Panel administrador</button>
-  </nav>
-</header>
+<div class="app-shell">
+  <aside class="sidebar sans">
+    <div class="brand">
+      <h1>Asignación de Asesores</h1>
+      <p id="subtitle">Trabajo de Grado</p>
+    </div>
+    <nav class="tabs">
+      <button id="tabPublic" class="active" onclick="switchView('public')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 22V12h6v10"/><path d="M3 10l9-7 9 7"/></svg>
+        Inscripción
+      </button>
+      <button id="tabProf" onclick="switchView('profGate')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Acceso profesores
+      </button>
+      <button id="tabAdmin" onclick="switchView('adminGate')">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Panel administrador
+      </button>
+    </nav>
+  </aside>
 
+  <div class="content-area">
 <main>
 
   <!-- ===================== VISTA PÚBLICA ===================== -->
@@ -501,9 +621,11 @@
     <div class="panel">
       <p class="small-note" id="profQuotaSummary"></p>
       <p class="small-note">Marca la casilla de un grupo (o de varios) para recomponerlos entre sí — por ejemplo, unir a estudiantes que se inscribieron por separado contigo. Solo puedes combinar tus propios estudiantes; no puedes moverlos a otro profesor ni separar a integrantes de un mismo grupo.</p>
-      <div class="merge-bar sans" id="profMergeBar" style="display:none;">
+      <label for="profSearchInput">Buscar</label>
+      <input type="text" id="profSearchInput" placeholder="Buscar por ID, cédula o nombre…" oninput="renderProfTable(false)">
+      <div class="merge-bar sans" id="profMergeBar" style="display:none; margin-top:14px;">
         <span id="profMergeCount">0 seleccionados (máximo 3)</span>
-        <input type="text" id="profMergeTitleInput" placeholder="Título de la propuesta del grupo combinado">
+        <input type="text" id="profMergeTitleInput" placeholder="Título de la propuesta (opcional — si se deja vacío, queda como 'Pendiente')">
         <button class="primary" id="profMergeBtn" onclick="combineProfGroups()" disabled>Combinar en un grupo</button>
       </div>
       <div id="profTableWrap"></div>
@@ -535,13 +657,28 @@
     </div>
 
     <div class="panel">
+      <h2>Cupos por profesor</h2>
+      <p class="small-note" id="quotaSummaryTotal"></p>
+      <label for="quotaSearchInput">Buscar</label>
+      <input type="text" id="quotaSearchInput" placeholder="Buscar profesor por nombre…" oninput="renderQuotaSummary()">
+      <div id="quotaSummaryWrap" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="panel">
       <h2>Sábana de matrícula</h2>
       <p class="small-note" id="adminSummary"></p>
       <p class="small-note">Marca la casilla de cada estudiante para recomponer un grupo: por ejemplo, unir a estudiantes que se inscribieron individualmente y ahora quieren armar un grupo de hasta 3. Al combinarlos, salen de su(s) inscripción(es) actual(es) y quedan en un grupo nuevo.</p>
-      <div class="merge-bar sans" id="mergeBar" style="display:none;">
+      <div class="filter-toggle sans">
+        <button class="active" id="filterAll" onclick="setSabanaDateFilter('all')">Todos</button>
+        <button id="filterToday" onclick="setSabanaDateFilter('today')">Hoy</button>
+      </div>
+      <label for="sabanaSearchInput">Buscar</label>
+      <input type="text" id="sabanaSearchInput" placeholder="Buscar por ID, cédula o nombre…" oninput="renderSabana(false)">
+      <p class="small-note" id="sabanaFilterInfo" style="margin-top:6px;"></p>
+      <div class="merge-bar sans" id="mergeBar" style="display:none; margin-top:14px;">
         <span id="mergeCount">0 seleccionados (máximo 3)</span>
         <select id="mergeProfSelect"></select>
-        <input type="text" id="mergeTitleInput" placeholder="Título de la propuesta del grupo combinado">
+        <input type="text" id="mergeTitleInput" placeholder="Título de la propuesta (opcional — si se deja vacío, queda como 'Pendiente')">
         <button class="primary" id="mergeBtn" onclick="combineSelectedStudents()" disabled>Combinar en un grupo</button>
       </div>
       <div id="sabanaTableWrap"></div>
@@ -589,6 +726,8 @@
   </section>
 
 </main>
+  </div>
+</div>
 
 <script>
 /* =========================================================
@@ -605,7 +744,9 @@ const MAX_GROUP_SIZE = 3;
 /* =========================================================
    ESTADO EN MEMORIA
 ========================================================= */
-let professors = [];      // {id, name, area, quota, remaining}
+let professors = [];      // {id, name, area, quota, remaining} — SOLO vista pública (con cupos calculados)
+let adminProfessors = []; // {id, name, area, quota, pin} — SOLO panel admin (edición/listado, sin "remaining")
+let adminQuotaSummary = []; // {id, name, area, quota, remaining} — para el panel de cupos por profesor
 let enrollments = [];      // solo se carga en el panel admin: {id, groupCode, profId, profName, timestamp, students}
 let studentDBRaw = [];      // solo panel admin: filas crudas de la hoja Estudiantes, para previsualizar
 let prereqDBRaw = [];       // solo panel admin: filas crudas de Fundamentos de Investigación, para previsualizar
@@ -654,7 +795,8 @@ async function loadAdminData(){
       alert("No se pudo cargar el panel: " + data.error);
       return;
     }
-    professors = (data.professors||[]).map(p=>({ id:p.id, name:p.nombre, area:p.area, quota:Number(p.cupo)||0, pin:p.clave||"" }));
+    adminProfessors = (data.professors||[]).map(p=>({ id:p.id, name:p.nombre, area:p.area, quota:Number(p.cupo)||0, pin:p.clave||"" }));
+    adminQuotaSummary = data.quotaSummary || [];
     enrollments = data.enrollments || [];
     studentDBRaw = data.students || [];
     prereqDBRaw = data.prereq || [];
@@ -685,6 +827,14 @@ function renderStatusBar(){
   `;
 }
 
+// Devuelve las 1-2 iniciales de un nombre, para el avatar circular de cada tarjeta.
+function getInitials_(name){
+  const parts = String(name||"").trim().split(/\s+/).filter(Boolean);
+  if(parts.length===0) return "?";
+  if(parts.length===1) return parts[0].slice(0,2).toUpperCase();
+  return (parts[0][0]+parts[1][0]).toUpperCase();
+}
+
 function renderProfGrid(){
   const grid = document.getElementById("profGrid");
   if(professors.length===0){
@@ -704,9 +854,12 @@ function renderProfGrid(){
     const areaTags = String(p.area||"").split(",").map(a=>a.trim()).filter(Boolean)
       .map(a=>`<span class="area-tag">${escapeHTML(a)}</span>`).join("");
     card.innerHTML = `
-      <div class="prof-main">
-        <p class="prof-name">${escapeHTML(p.name)}</p>
-        <div class="prof-areas">${areaTags}</div>
+      <div class="prof-row">
+        <div class="avatar-circle">${escapeHTML(getInitials_(p.name))}</div>
+        <div class="prof-main">
+          <p class="prof-name">${escapeHTML(p.name)}</p>
+          <div class="prof-areas">${areaTags}</div>
+        </div>
       </div>
       <div class="prof-quota">
         <span>${full?"Sin cupo":"Disponible"}</span>
@@ -970,9 +1123,57 @@ function logout(){
 async function renderAdmin(){
   document.getElementById("sabanaTableWrap").innerHTML = `<div class="empty-state">Cargando…</div>`;
   await loadAdminData();
-  document.getElementById("profTextarea").value = professorsToText(professors);
+  await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública
+  document.getElementById("profTextarea").value = professorsToText(adminProfessors);
   document.getElementById("studentTextarea").value = "";
+  renderQuotaSummary();
   renderSabana();
+}
+
+function renderQuotaSummary(){
+  const wrap = document.getElementById("quotaSummaryWrap");
+  const totalEl = document.getElementById("quotaSummaryTotal");
+  if(adminQuotaSummary.length===0){
+    totalEl.textContent = "Todavía no hay profesores cargados.";
+    wrap.innerHTML = "";
+    return;
+  }
+
+  const totalQuota = adminQuotaSummary.reduce((a,p)=>a+(p.quota||0),0);
+  const totalUsed = adminQuotaSummary.reduce((a,p)=>a+((p.quota||0)-(p.remaining||0)),0);
+  const totalRemaining = adminQuotaSummary.reduce((a,p)=>a+(p.remaining||0),0);
+  totalEl.textContent = `${adminQuotaSummary.length} profesores · ${totalUsed} cupos usados · ${totalRemaining} cupos disponibles · ${totalQuota} cupos en total.`;
+
+  const term = (document.getElementById("quotaSearchInput").value || "").trim().toLowerCase();
+  const filtered = adminQuotaSummary.filter(p => !term || (p.name||"").toLowerCase().includes(term));
+
+  let rows = "";
+  if(filtered.length===0){
+    rows = `<tr><td colspan="5" style="text-align:center; color:var(--ink-soft); padding:20px;">Sin resultados para "${escapeHTML(term)}".</td></tr>`;
+  }else{
+    filtered.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(p=>{
+      const used = (p.quota||0) - (p.remaining||0);
+      let pillClass = "";
+      if(p.remaining<=0) pillClass="zero";
+      else if(p.remaining <= Math.max(1, Math.ceil((p.quota||1)*0.25))) pillClass="low";
+      rows += `<tr>
+        <td><div style="display:flex;align-items:center;gap:10px;"><div class="avatar-circle" style="width:30px;height:30px;font-size:0.7rem;">${escapeHTML(getInitials_(p.name))}</div>${escapeHTML(p.name)}</div></td>
+        <td>${escapeHTML(p.area||"")}</td>
+        <td>${p.quota}</td>
+        <td>${used}</td>
+        <td><span class="quota-pill ${pillClass}">${p.remaining}</span></td>
+      </tr>`;
+    });
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr><th>Profesor</th><th>Área</th><th>Cupo total</th><th>Cupos usados</th><th>Cupos disponibles</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
 }
 
 function professorsToText(list){
@@ -1033,44 +1234,93 @@ function loadPrereqSample(){
   document.getElementById("prereqTextarea").value = prereqRecordsToText(prereqDBRaw);
 }
 
-function renderSabana(){
+// Coincide si el término aparece en el código de grupo, el profesor, o el
+// ID/cédula/nombre de cualquier integrante — usado por el buscador de la sábana.
+function matchesSearch_(group, term){
+  if(!term) return true;
+  const t = term.toLowerCase();
+  if((group.groupCode||"").toLowerCase().includes(t)) return true;
+  if((group.profName||"").toLowerCase().includes(t)) return true;
+  return group.students.some(s=>
+    (s.name||"").toLowerCase().includes(t) ||
+    (s.cedula||"").toLowerCase().includes(t) ||
+    (s.code||"").toLowerCase().includes(t)
+  );
+}
+
+// true si el timestamp (ISO) cae en el día de hoy, según la hora local del navegador.
+function isToday_(timestamp){
+  if(!timestamp) return false;
+  const d = new Date(timestamp);
+  const now = new Date();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+}
+
+let sabanaDateFilter = "all"; // "all" | "today"
+function setSabanaDateFilter(value){
+  sabanaDateFilter = value;
+  document.getElementById("filterAll").classList.toggle("active", value==="all");
+  document.getElementById("filterToday").classList.toggle("active", value==="today");
+  renderSabana(false); // preserva la selección de grupos ya marcados
+}
+
+function renderSabana(resetSelection){
+  if(resetSelection===undefined) resetSelection = true;
   const wrap = document.getElementById("sabanaTableWrap");
   const summary = document.getElementById("adminSummary");
   const totalStudents = enrollments.reduce((a,e)=>a+e.students.length,0);
   summary.textContent = `${enrollments.length} grupos · ${totalStudents} estudiantes registrados en total.`;
 
-  mergeSelection.clear();
+  if(resetSelection) mergeSelection.clear();
 
   if(enrollments.length===0){
     wrap.innerHTML = `<div class="empty-state">Todavía no hay inscripciones.</div>`;
     document.getElementById("mergeBar").style.display = "none";
+    document.getElementById("sabanaFilterInfo").textContent = "";
     return;
   }
   document.getElementById("mergeBar").style.display = "flex";
   updateMergeBar();
 
-  const profOptions = professors.slice().sort((a,b)=>a.name.localeCompare(b.name))
+  const profOptions = adminProfessors.slice().sort((a,b)=>a.name.localeCompare(b.name))
     .map(p=>`<option value="${p.id}">${escapeHTML(p.name)}</option>`).join("");
+  const currentProfSelection = document.getElementById("mergeProfSelect").value;
   document.getElementById("mergeProfSelect").innerHTML = `<option value="">Elige asesor…</option>` + profOptions;
+  document.getElementById("mergeProfSelect").value = currentProfSelection;
+
+  const term = (document.getElementById("sabanaSearchInput").value || "").trim();
+  const filtered = enrollments.filter(e=>
+    matchesSearch_(e, term) && (sabanaDateFilter!=="today" || isToday_(e.timestamp))
+  );
+
+  document.getElementById("sabanaFilterInfo").textContent =
+    sabanaDateFilter==="today"
+      ? `Mostrando ${filtered.length} grupo${filtered.length===1?"":"s"} registrado${filtered.length===1?"":"s"} hoy (de ${enrollments.length} en total).`
+      : `Mostrando ${filtered.length} de ${enrollments.length} grupos.`;
 
   let rows = "";
-  enrollments.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
-  .forEach(e=>{
-    e.students.forEach((s,idx)=>{
-      rows += `<tr>
-        ${idx===0?`<td rowspan="${e.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(e.id)}" onchange="onGroupCheckChange(this, mergeSelection, 'mergeCount', 'mergeBtn')"></td>`:""}
-        <td>${idx===0?escapeHTML(e.groupCode||"—"):""}</td>
-        <td>${idx===0?escapeHTML(e.profName):""}</td>
-        <td>${idx===0?escapeHTML(e.groupTitle||"—"):""}</td>
-        <td>${escapeHTML(s.name)}${s.manual?'<span class="tag-review">Revisar dato</span>':''}</td>
-        <td>${escapeHTML(s.code)}</td>
-        <td>${escapeHTML(s.cedula)}</td>
-        <td>${escapeHTML(s.email)}</td>
-        <td>${idx===0?new Date(e.timestamp).toLocaleString("es-CO"):""}</td>
-        <td>${idx===0?`<button class="danger-btn" onclick="deleteEnrollment('${e.id}')">Eliminar grupo</button>`:""}</td>
-      </tr>`;
+  if(filtered.length===0){
+    rows = `<tr><td colspan="10" style="text-align:center; color:var(--ink-soft); padding:20px;">Sin resultados para "${escapeHTML(term)}".</td></tr>`;
+  }else{
+    filtered.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
+    .forEach(e=>{
+      const checked = mergeSelection.has(e.id) ? "checked" : "";
+      e.students.forEach((s,idx)=>{
+        rows += `<tr>
+          ${idx===0?`<td rowspan="${e.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(e.id)}" ${checked} onchange="onGroupCheckChange(this, mergeSelection, 'mergeCount', 'mergeBtn')"></td>`:""}
+          <td>${idx===0?escapeHTML(e.groupCode||"—"):""}</td>
+          <td>${idx===0?escapeHTML(e.profName):""}</td>
+          <td>${idx===0?escapeHTML(e.groupTitle||"—"):""}</td>
+          <td>${escapeHTML(s.name)}${s.manual?'<span class="tag-review">Revisar dato</span>':''}</td>
+          <td>${escapeHTML(s.code)}</td>
+          <td>${escapeHTML(s.cedula)}</td>
+          <td>${escapeHTML(s.email)}</td>
+          <td>${idx===0?new Date(e.timestamp).toLocaleString("es-CO"):""}</td>
+          <td>${idx===0?`<button class="danger-btn" onclick="deleteEnrollment('${e.id}')">Eliminar grupo</button>`:""}</td>
+        </tr>`;
+      });
     });
-  });
+  }
 
   wrap.innerHTML = `
     <table>
@@ -1147,11 +1397,7 @@ async function combineSelectedStudents(){
     alert("Elige el profesor para el grupo combinado.");
     return;
   }
-  const title = document.getElementById("mergeTitleInput").value.trim();
-  if(!title){
-    alert("Escribe el título de la propuesta para el grupo combinado.");
-    return;
-  }
+  const title = document.getElementById("mergeTitleInput").value.trim() || "Pendiente";
   const titleWords = title.split(/\s+/).filter(Boolean).length;
   if(titleWords > 30){
     alert(`El título supera las 30 palabras (tiene ${titleWords}).`);
@@ -1241,14 +1487,16 @@ async function refreshProfPanel(){
     const data = await apiGet({ action:"profData", profId: profSession.profId, pin: profSession.pin });
     if(!data.ok){ alert("Tu sesión ya no es válida. Vuelve a iniciar sesión."); logoutProf(); return; }
     renderProfPanel(data);
+    await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública
   }catch(e){
     alert("No se pudo actualizar el panel. Intenta de nuevo.");
   }
 }
 
-function renderProfTable(){
+function renderProfTable(resetSelection){
+  if(resetSelection===undefined) resetSelection = true;
   const wrap = document.getElementById("profTableWrap");
-  profMergeSelection.clear();
+  if(resetSelection) profMergeSelection.clear();
 
   if(profGroupsData.length===0){
     wrap.innerHTML = `<div class="empty-state">Todavía no tienes grupos asignados.</div>`;
@@ -1256,24 +1504,33 @@ function renderProfTable(){
     return;
   }
   document.getElementById("profMergeBar").style.display = "flex";
-  document.getElementById("profMergeCount").textContent = `0 estudiantes seleccionados en 0 grupos (máximo ${MAX_GROUP_SIZE})`;
-  document.getElementById("profMergeBtn").disabled = true;
+  const totalSel = Array.from(profMergeSelection.values()).reduce((a,g)=>a+g.students.length,0);
+  document.getElementById("profMergeCount").textContent = `${totalSel} estudiante${totalSel===1?"":"s"} seleccionado${totalSel===1?"":"s"} en ${profMergeSelection.size} grupo${profMergeSelection.size===1?"":"s"} (máximo ${MAX_GROUP_SIZE})`;
+  document.getElementById("profMergeBtn").disabled = totalSel < 1;
+
+  const term = (document.getElementById("profSearchInput").value || "").trim();
+  const filtered = profGroupsData.filter(g=>matchesSearch_(g, term));
 
   let rows = "";
-  profGroupsData.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
-  .forEach(g=>{
-    g.students.forEach((s,idx)=>{
-      rows += `<tr>
-        ${idx===0?`<td rowspan="${g.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(g.id)}" onchange="onGroupCheckChange(this, profMergeSelection, 'profMergeCount', 'profMergeBtn')"></td>`:""}
-        <td>${idx===0?escapeHTML(g.groupCode||"—"):""}</td>
-        <td>${idx===0?escapeHTML(g.groupTitle||"—"):""}</td>
-        <td>${escapeHTML(s.name)}</td>
-        <td>${escapeHTML(s.code)}</td>
-        <td>${escapeHTML(s.cedula)}</td>
-        <td>${escapeHTML(s.email)}</td>
-      </tr>`;
+  if(filtered.length===0){
+    rows = `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:20px;">Sin resultados para "${escapeHTML(term)}".</td></tr>`;
+  }else{
+    filtered.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
+    .forEach(g=>{
+      const checked = profMergeSelection.has(g.id) ? "checked" : "";
+      g.students.forEach((s,idx)=>{
+        rows += `<tr>
+          ${idx===0?`<td rowspan="${g.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(g.id)}" ${checked} onchange="onGroupCheckChange(this, profMergeSelection, 'profMergeCount', 'profMergeBtn')"></td>`:""}
+          <td>${idx===0?escapeHTML(g.groupCode||"—"):""}</td>
+          <td>${idx===0?escapeHTML(g.groupTitle||"—"):""}</td>
+          <td>${escapeHTML(s.name)}</td>
+          <td>${escapeHTML(s.code)}</td>
+          <td>${escapeHTML(s.cedula)}</td>
+          <td>${escapeHTML(s.email)}</td>
+        </tr>`;
+      });
     });
-  });
+  }
 
   wrap.innerHTML = `
     <table>
@@ -1292,11 +1549,7 @@ async function combineProfGroups(){
     alert("Selecciona al menos un grupo tuyo.");
     return;
   }
-  const title = document.getElementById("profMergeTitleInput").value.trim();
-  if(!title){
-    alert("Escribe el título de la propuesta para el grupo combinado.");
-    return;
-  }
+  const title = document.getElementById("profMergeTitleInput").value.trim() || "Pendiente";
   const titleWords = title.split(/\s+/).filter(Boolean).length;
   if(titleWords > 30){
     alert(`El título supera las 30 palabras (tiene ${titleWords}).`);
@@ -1332,7 +1585,7 @@ async function combineProfGroups(){
 
 async function saveProfessorsFromText(){
   const text = document.getElementById("profTextarea").value;
-  const parsed = parseProfessorsText(text, professors);
+  const parsed = parseProfessorsText(text, adminProfessors);
   if(parsed.length===0){
     alert("El listado está vacío.");
     return;
@@ -1410,7 +1663,7 @@ function exportCSV(){
   const header = ["Código grupo","Profesor","Área","Título propuesta","Nombre estudiante","ID","Cédula","Correo","Dato manual (revisar)","Fecha inscripción"];
   const lines = [header.join(",")];
   enrollments.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(e=>{
-    const prof = professors.find(p=>p.id===e.profId);
+    const prof = adminProfessors.find(p=>p.id===e.profId);
     const area = prof ? prof.area : "";
     e.students.forEach(s=>{
       const row = [
