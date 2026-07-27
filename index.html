@@ -256,6 +256,57 @@
   .quota-pill.low{ background:var(--warn-soft); color:var(--warn); }
   .quota-pill.zero{ background:var(--danger-soft); color:var(--danger); }
 
+  .status-pill{
+    display:inline-block;
+    font-family: var(--font);
+    font-size:0.7rem;
+    font-weight:700;
+    padding:2px 10px;
+    border-radius:20px;
+    margin-left:6px;
+    white-space:nowrap;
+  }
+  .status-pill.activo{ background:#e5f3ea; color:#1f7a41; }
+  .status-pill.asp{ background:var(--accent-soft); color:var(--accent); }
+  .status-pill.suspendido{ background:var(--danger-soft); color:var(--danger); }
+  .status-pill.sindatos{ background:var(--paper); color:var(--ink-soft); }
+
+  .alert-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:10px 12px;
+    border-bottom:1px solid #efece3;
+    font-family: var(--font);
+    font-size:0.85rem;
+  }
+  .alert-row:last-child{ border-bottom:none; }
+
+  .attendance-group{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .attendance-group h4{
+    margin:0 0 10px;
+    font-size:0.95rem;
+  }
+  .attendance-student-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:6px 0;
+    font-family: var(--font);
+    font-size:0.85rem;
+  }
+  .attendance-student-row input[type=checkbox]{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+  }
+
   .panel{
     background:var(--card);
     border:1px solid transparent;
@@ -554,6 +605,11 @@
   <!-- ===================== VISTA PÚBLICA ===================== -->
   <section id="view-public" class="view active">
 
+    <div class="panel sans" id="periodPanelPublic" style="display:none;">
+      <label for="periodSelect">Periodo académico</label>
+      <select id="periodSelect" onchange="onPeriodChange()"></select>
+    </div>
+
     <div class="panel instructivo sans" id="instructivoPanel">
       <h2>Cómo inscribirte</h2>
       <ol>
@@ -597,8 +653,12 @@
   <section id="view-profGate" class="view">
     <div class="login-box sans">
       <h2>Acceso profesores</h2>
-      <label for="profLoginSelect">Tu nombre</label>
-      <select id="profLoginSelect"></select>
+      <label for="profLoginPeriodSelect">Periodo académico</label>
+      <select id="profLoginPeriodSelect" onchange="onProfLoginPeriodChange()"></select>
+      <div style="margin-top:12px;">
+        <label for="profLoginSelect">Tu nombre</label>
+        <select id="profLoginSelect"></select>
+      </div>
       <div style="margin-top:12px;">
         <label for="profLoginPass">Clave</label>
         <input type="text" id="profLoginPass" placeholder="Ingresa tu clave">
@@ -615,7 +675,14 @@
     <div class="admin-toolbar sans">
       <strong id="profPanelTitle">Mis grupos</strong>
       <span style="flex:1"></span>
+      <button class="secondary" id="profAlertBtn" onclick="toggleProfAlerts()" style="display:none;">🔔 Alertas <span id="profAlertCount"></span></button>
       <button class="danger-btn" onclick="logoutProf()">Salir</button>
+    </div>
+
+    <div class="panel" id="profAlertPanel" style="display:none;">
+      <h2>Estudiantes inactivados esta semana</h2>
+      <p class="small-note" id="profAlertSubtitle"></p>
+      <div id="profAlertList"></div>
     </div>
 
     <div class="panel">
@@ -629,6 +696,14 @@
         <button class="primary" id="profMergeBtn" onclick="combineProfGroups()" disabled>Combinar en un grupo</button>
       </div>
       <div id="profTableWrap"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Asistencia y grabaciones</h2>
+      <p class="small-note">Elige la semana y marca, para cada uno de tus grupos, quién asistió a la asesoría y el link de la grabación de esa sesión.</p>
+      <label for="attendanceWeekSelect">Semana</label>
+      <select id="attendanceWeekSelect" onchange="renderAttendanceSection()"></select>
+      <div id="attendanceWrap" style="margin-top:14px;"></div>
     </div>
   </section>
 
@@ -654,6 +729,30 @@
       <button class="secondary" onclick="exportCSV()">Descargar sábana (CSV)</button>
       <button class="secondary" onclick="switchView('public')">Ver vista pública</button>
       <button class="danger-btn" onclick="logout()">Salir</button>
+    </div>
+
+    <div class="panel sans">
+      <label for="adminPeriodSelect">Periodo académico que estás administrando</label>
+      <select id="adminPeriodSelect" onchange="onAdminPeriodChange()"></select>
+      <p class="small-note" style="margin-top:8px;">Todo lo que ves y editas abajo (profesores, cupos, sábana, estudiantes, prerrequisito) corresponde únicamente a este periodo. Cada periodo tiene su propia información, totalmente independiente de los demás.</p>
+    </div>
+
+    <div class="panel">
+      <h2>Periodos académicos</h2>
+      <p class="small-note">Formato: una línea por periodo → <code>Código | Nombre | Activo | Actual</code>. "Activo" controla si aparece como opción para inscribirse o para el acceso de profesores (SI/NO). "Actual" marca cuál es el periodo que ve el público por defecto — solo uno puede quedar marcado como actual.</p>
+      <textarea id="periodsTextarea"></textarea>
+      <div style="margin-top:10px;">
+        <button class="primary" onclick="savePeriodsFromText()">Guardar periodos</button>
+      </div>
+      <h3>Copiar profesores de otro periodo</h3>
+      <p class="small-note">Trae el listado de profesores (con cupos y claves) de otro periodo hacia el que estás administrando ahora — útil porque suele ser el mismo grupo semestre a semestre.</p>
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:8px;">
+        <div style="flex:1; min-width:200px;">
+          <label for="copySourcePeriodSelect">Copiar desde</label>
+          <select id="copySourcePeriodSelect"></select>
+        </div>
+        <button class="secondary" onclick="copyProfessorsFromPeriod()">Copiar a este periodo</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -718,6 +817,19 @@
     </div>
 
     <div class="panel">
+      <h2>Reporte semanal de matrícula</h2>
+      <p class="small-note">Sube, una vez por semana, el estado de matrícula de los estudiantes (Activo, ASP o Suspendido). Con esto, cada profesor ve un tag de estado junto a sus estudiantes y recibe alerta si alguno se inactivó respecto a la semana anterior.</p>
+      <label for="weeklyStatusWeekSelect">Semana</label>
+      <select id="weeklyStatusWeekSelect"></select>
+      <p class="small-note" style="margin-top:8px;">Formato: una línea por estudiante → <code>Cédula | ID/Código | Nombre completo | Estado</code>. El estado debe ser exactamente <strong>Activo</strong>, <strong>ASP</strong> (Autorizado para Asistir) o <strong>Suspendido</strong>.</p>
+      <textarea id="weeklyStatusTextarea" placeholder="1000123456 | EST-0231 | Juana Pérez Gómez | Activo"></textarea>
+      <div style="margin-top:10px;">
+        <button class="primary" onclick="saveWeeklyStatusFromText()">Guardar reporte de esta semana</button>
+      </div>
+      <p class="small-note" style="margin-top:8px;" id="weeklyStatusUploadedInfo"></p>
+    </div>
+
+    <div class="panel">
       <h2>Restablecer datos</h2>
       <p class="small-note">Elimina todas las inscripciones registradas (los profesores y las bases de estudiantes no se borran). Esta acción no se puede deshacer.</p>
       <button class="danger-btn" onclick="resetEnrollments()">Borrar todas las inscripciones</button>
@@ -744,6 +856,10 @@ const MAX_GROUP_SIZE = 3;
 /* =========================================================
    ESTADO EN MEMORIA
 ========================================================= */
+let activePeriods = [];   // {codigo, nombre} — periodos activos, para los selectores públicos y de profesor
+let currentPeriod = null; // periodo elegido en la vista pública de inscripción
+let adminAllPeriods = []; // {codigo, nombre, activo, actual} — TODOS los periodos, para gestión admin
+let adminSelectedPeriod = null; // periodo que el admin está administrando ahora mismo
 let professors = [];      // {id, name, area, quota, remaining} — SOLO vista pública (con cupos calculados)
 let adminProfessors = []; // {id, name, area, quota, pin} — SOLO panel admin (edición/listado, sin "remaining")
 let adminQuotaSummary = []; // {id, name, area, quota, remaining} — para el panel de cupos por profesor
@@ -755,9 +871,12 @@ let isAdmin = false;
 let cedulaLookupTimer = null;
 let prereqCheckTimer = null;
 let mergeSelection = new Map(); // key: groupId -> {groupId, profId, profName, students:[{cedula,code,name}]} — GRUPOS completos marcados (admin)
-let profSession = null; // {profId, pin, profName, quota, remaining}
+let profSession = null; // {profId, pin, profName, period, quota, remaining}
 let profGroupsData = []; // grupos propios cargados en el panel de profesor
 let profMergeSelection = new Map(); // key: groupId -> {groupId, students:[{cedula,code,name}]} — grupos marcados (panel profesor)
+let profNewlyInactive = []; // estudiantes propios que se inactivaron entre la penúltima y la última semana cargada
+let profAttendanceData = {}; // { <groupId>: { <semana>: { link, students: { cedula: true/false } } } } — ya guardado
+let profAlertVisible = false;
 
 /* =========================================================
    LLAMADAS AL BACKEND
@@ -777,20 +896,53 @@ async function apiPost(body){
   return res.json();
 }
 
-async function loadPublicState(){
+// Carga la lista de periodos activos (para el selector público y el de
+// profesores) y decide con cuál arrancar la vista pública.
+async function loadPeriods(){
   try{
-    const data = await apiGet({ action: "state" });
+    const data = await apiGet({ action: "periods" });
+    activePeriods = data.periods || [];
+    currentPeriod = data.current || (activePeriods[0] && activePeriods[0].codigo) || null;
+  }catch(e){
+    console.error("Error cargando periodos", e);
+    activePeriods = [];
+    currentPeriod = null;
+  }
+
+  const periodSelect = document.getElementById("periodSelect");
+  const periodPanel = document.getElementById("periodPanelPublic");
+  if(activePeriods.length > 1){
+    periodPanel.style.display = "block";
+    periodSelect.innerHTML = activePeriods.map(p=>`<option value="${p.codigo}">${escapeHTML(p.nombre)} (${escapeHTML(p.codigo)})</option>`).join("");
+    periodSelect.value = currentPeriod;
+  }else{
+    periodPanel.style.display = "none";
+  }
+
+  populateProfLoginPeriodSelect();
+}
+
+function onPeriodChange(){
+  currentPeriod = document.getElementById("periodSelect").value;
+  selectedProfId = null;
+  document.getElementById("formPanel").style.display = "none";
+  loadPublicState().then(()=>{ renderStatusBar(); renderProfGrid(); });
+}
+
+async function loadPublicState(){
+  if(!currentPeriod) { professors = []; return; }
+  try{
+    const data = await apiGet({ action: "state", period: currentPeriod });
     professors = data.professors || [];
   }catch(e){
     console.error("Error cargando estado", e);
     professors = [];
   }
-  populateProfLoginSelect();
 }
 
 async function loadAdminData(){
   try{
-    const data = await apiGet({ action: "adminData", key: ADMIN_KEY });
+    const data = await apiGet({ action: "adminData", key: ADMIN_KEY, period: adminSelectedPeriod });
     if(data.error){
       alert("No se pudo cargar el panel: " + data.error);
       return;
@@ -802,6 +954,7 @@ async function loadAdminData(){
     prereqDBRaw = data.prereq || [];
     document.getElementById("studentDbCount").textContent = data.studentCount || 0;
     document.getElementById("prereqDbCount").textContent = data.prereqCount || 0;
+    populateWeeklyStatusWeekSelect(data.weeksUploaded || []);
   }catch(e){
     console.error("Error cargando panel admin", e);
     alert("No se pudo conectar con el backend. Revisa la URL configurada.");
@@ -958,8 +1111,8 @@ function onIdentifierInput(input){
   cedulaLookupTimer = setTimeout(async ()=>{
     try{
       const [studentData, prereqData] = await Promise.all([
-        apiGet({ action:"lookupStudent", value: value }),
-        apiGet({ action:"checkPrereq", cedula: cedVal, code: codeVal })
+        apiGet({ action:"lookupStudent", value: value, period: currentPeriod }),
+        apiGet({ action:"checkPrereq", cedula: cedVal, code: codeVal, period: currentPeriod })
       ]);
       // el usuario pudo seguir escribiendo; solo aplica si el valor consultado no cambió
       const stillCurrent = input.classList.contains("code-input")
@@ -1076,7 +1229,7 @@ async function submitGroup(){
   submitBtn.textContent = "Enviando…";
 
   try{
-    const result = await apiPost({ action:"enroll", profId: prof.id, students, groupTitle });
+    const result = await apiPost({ action:"enroll", profId: prof.id, students, groupTitle, period: currentPeriod });
     if(result.error){
       msgEl.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`;
       await loadPublicState();
@@ -1108,6 +1261,7 @@ function tryLogin(){
   const loginMsg = document.getElementById("loginMsg");
   if(val === ADMIN_KEY){
     isAdmin = true;
+    if(!adminSelectedPeriod) adminSelectedPeriod = currentPeriod;
     switchView("admin");
     renderAdmin();
   }else{
@@ -1120,10 +1274,102 @@ function logout(){
   switchView("public");
 }
 
+// Carga TODOS los periodos (incluidos inactivos) para que el admin los gestione,
+// y decide con cuál periodo arranca a administrar.
+async function loadAdminPeriodsList(){
+  try{
+    const data = await apiGet({ action: "adminPeriods", key: ADMIN_KEY });
+    adminAllPeriods = data.periods || [];
+  }catch(e){
+    console.error("Error cargando periodos (admin)", e);
+    adminAllPeriods = [];
+  }
+  if(!adminSelectedPeriod || !adminAllPeriods.some(p=>p.codigo===adminSelectedPeriod)){
+    const marked = adminAllPeriods.find(p=>p.actual);
+    adminSelectedPeriod = (marked && marked.codigo) || (adminAllPeriods[0] && adminAllPeriods[0].codigo) || null;
+  }
+  const sel = document.getElementById("adminPeriodSelect");
+  sel.innerHTML = adminAllPeriods.map(p=>`<option value="${p.codigo}">${escapeHTML(p.nombre)} (${escapeHTML(p.codigo)})${p.activo?"":" — inactivo"}</option>`).join("");
+  sel.value = adminSelectedPeriod;
+
+  document.getElementById("periodsTextarea").value = periodsToText(adminAllPeriods);
+
+  const copySel = document.getElementById("copySourcePeriodSelect");
+  copySel.innerHTML = adminAllPeriods.filter(p=>p.codigo!==adminSelectedPeriod)
+    .map(p=>`<option value="${p.codigo}">${escapeHTML(p.nombre)} (${escapeHTML(p.codigo)})</option>`).join("");
+}
+
+function onAdminPeriodChange(){
+  adminSelectedPeriod = document.getElementById("adminPeriodSelect").value;
+  renderAdmin();
+}
+
+function periodsToText(list){
+  return list.map(p=>`${p.codigo} | ${p.nombre} | ${p.activo?"SI":"NO"} | ${p.actual?"SI":"NO"}`).join("\n");
+}
+function parsePeriodsText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  return lines.map(line=>{
+    const parts = line.split("|").map(p=>p.trim());
+    return {
+      codigo: parts[0]||"",
+      nombre: parts[1]||parts[0]||"",
+      activo: (parts[2]||"").toUpperCase()==="SI",
+      actual: (parts[3]||"").toUpperCase()==="SI"
+    };
+  }).filter(p=>p.codigo);
+}
+
+async function savePeriodsFromText(){
+  const text = document.getElementById("periodsTextarea").value;
+  const parsed = parsePeriodsText(text);
+  if(parsed.length===0){
+    alert("El listado de periodos no puede quedar vacío.");
+    return;
+  }
+  try{
+    const result = await apiPost({ action:"adminSavePeriods", key: ADMIN_KEY, periods: parsed });
+    if(result.error){ alert("Error: "+result.error); return; }
+    alert(`Periodos actualizados (${result.count}).`);
+    await loadAdminPeriodsList();
+    await loadPeriods(); // refresca también los selectores públicos y de profesor
+    renderAdmin();
+  }catch(e){
+    alert("No se pudo guardar el listado de periodos. Intenta de nuevo.");
+  }
+}
+
+async function copyProfessorsFromPeriod(){
+  const source = document.getElementById("copySourcePeriodSelect").value;
+  if(!source){
+    alert("Elige de qué periodo copiar.");
+    return;
+  }
+  await doCopyProfessors(source, adminSelectedPeriod, false);
+}
+
+async function doCopyProfessors(source, target, overwrite){
+  try{
+    const result = await apiPost({ action:"adminCopyProfessors", key: ADMIN_KEY, sourcePeriod: source, targetPeriod: target, overwrite });
+    if(result.needsConfirm){
+      if(confirm("El periodo destino ya tiene profesores cargados. ¿Sobrescribirlos con los del periodo de origen?")){
+        await doCopyProfessors(source, target, true);
+      }
+      return;
+    }
+    if(result.error){ alert("Error: "+result.error); return; }
+    alert(`Se copiaron ${result.count} profesores.`);
+    await renderAdmin();
+  }catch(e){
+    alert("No se pudo copiar el listado. Intenta de nuevo.");
+  }
+}
+
 async function renderAdmin(){
   document.getElementById("sabanaTableWrap").innerHTML = `<div class="empty-state">Cargando…</div>`;
+  await loadAdminPeriodsList();
   await loadAdminData();
-  await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública
+  if(adminSelectedPeriod === currentPeriod) await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública, si aplica
   document.getElementById("profTextarea").value = professorsToText(adminProfessors);
   document.getElementById("studentTextarea").value = "";
   renderQuotaSummary();
@@ -1335,7 +1581,7 @@ function renderSabana(resetSelection){
 async function deleteEnrollment(id){
   if(!confirm("¿Eliminar este grupo de la sábana? Esto liberará su cupo.")) return;
   try{
-    const result = await apiPost({ action:"adminDeleteGroup", key: ADMIN_KEY, groupId: id });
+    const result = await apiPost({ action:"adminDeleteGroup", key: ADMIN_KEY, groupId: id, period: adminSelectedPeriod });
     if(result.error){ alert("Error: "+result.error); return; }
     await renderAdmin();
   }catch(e){
@@ -1416,6 +1662,7 @@ async function combineSelectedStudents(){
     const result = await apiPost({
       action: "adminMergeStudents",
       key: ADMIN_KEY,
+      period: adminSelectedPeriod,
       students: allStudents.map(s=>({ groupId:s.groupId, cedula:s.cedula, code:s.code })),
       targetProfId,
       groupTitle: title
@@ -1436,29 +1683,47 @@ async function combineSelectedStudents(){
 /* =========================================================
    PANEL PROFESOR
 ========================================================= */
-function populateProfLoginSelect(){
-  const sel = document.getElementById("profLoginSelect");
+function populateProfLoginPeriodSelect(){
+  const sel = document.getElementById("profLoginPeriodSelect");
   if(!sel) return;
-  const options = professors.slice().sort((a,b)=>a.name.localeCompare(b.name))
-    .map(p=>`<option value="${p.id}">${escapeHTML(p.name)}</option>`).join("");
-  sel.innerHTML = `<option value="">Selecciona tu nombre…</option>` + options;
+  sel.innerHTML = activePeriods.map(p=>`<option value="${p.codigo}">${escapeHTML(p.nombre)} (${escapeHTML(p.codigo)})</option>`).join("");
+  sel.value = currentPeriod;
+  onProfLoginPeriodChange();
+}
+
+// Al elegir el periodo en el login de profesor, recarga el listado de
+// nombres de profesor correspondiente A ESE periodo (cada periodo tiene
+// su propio listado de profesores, independiente de los demás).
+async function onProfLoginPeriodChange(){
+  const period = document.getElementById("profLoginPeriodSelect").value;
+  const sel = document.getElementById("profLoginSelect");
+  sel.innerHTML = `<option value="">Cargando…</option>`;
+  try{
+    const data = await apiGet({ action: "state", period });
+    const list = (data.professors || []).slice().sort((a,b)=>a.name.localeCompare(b.name));
+    sel.innerHTML = `<option value="">Selecciona tu nombre…</option>` + list.map(p=>`<option value="${p.id}">${escapeHTML(p.name)}</option>`).join("");
+  }catch(e){
+    sel.innerHTML = `<option value="">No se pudo cargar</option>`;
+  }
 }
 
 async function tryProfLogin(){
+  const period = document.getElementById("profLoginPeriodSelect").value;
   const profId = document.getElementById("profLoginSelect").value;
   const pin = document.getElementById("profLoginPass").value.trim();
   const msgEl = document.getElementById("profLoginMsg");
   msgEl.innerHTML = "";
+  if(!period){ msgEl.innerHTML = `<div class="msg error">Selecciona el periodo académico.</div>`; return; }
   if(!profId){ msgEl.innerHTML = `<div class="msg error">Selecciona tu nombre en la lista.</div>`; return; }
   if(!pin){ msgEl.innerHTML = `<div class="msg error">Escribe tu clave.</div>`; return; }
 
   try{
-    const data = await apiGet({ action:"profData", profId, pin });
+    const data = await apiGet({ action:"profData", profId, pin, period });
     if(!data.ok){
       msgEl.innerHTML = `<div class="msg error">${escapeHTML(data.error||"No se pudo validar el acceso.")}</div>`;
       return;
     }
-    profSession = { profId: data.profId, pin, profName: data.profName };
+    profSession = { profId: data.profId, pin, profName: data.profName, period };
     document.getElementById("profLoginPass").value = "";
     switchView("prof");
     renderProfPanel(data);
@@ -1476,21 +1741,64 @@ function logoutProf(){
 }
 
 function renderProfPanel(data){
-  document.getElementById("profPanelTitle").textContent = `Mis grupos — ${data.profName}`;
+  const periodInfo = activePeriods.find(p=>p.codigo===profSession.period);
+  const periodLabel = periodInfo ? `${periodInfo.nombre} (${periodInfo.codigo})` : profSession.period;
+  document.getElementById("profPanelTitle").textContent = `Mis grupos — ${data.profName} · ${periodLabel}`;
   document.getElementById("profQuotaSummary").textContent = `Cupos: ${data.remaining} disponibles de ${data.quota} en total.`;
   profGroupsData = data.groups || [];
+  profNewlyInactive = data.newlyInactive || [];
+  profAttendanceData = data.attendance || {};
   renderProfTable();
+  renderProfAlertButton();
+  populateAttendanceWeekSelect();
+  renderAttendanceSection();
+}
+
+function renderProfAlertButton(){
+  const btn = document.getElementById("profAlertBtn");
+  const countEl = document.getElementById("profAlertCount");
+  if(profNewlyInactive.length > 0){
+    btn.style.display = "inline-block";
+    countEl.textContent = `(${profNewlyInactive.length})`;
+  }else{
+    btn.style.display = "none";
+    document.getElementById("profAlertPanel").style.display = "none";
+    profAlertVisible = false;
+  }
+}
+
+function toggleProfAlerts(){
+  profAlertVisible = !profAlertVisible;
+  const panel = document.getElementById("profAlertPanel");
+  panel.style.display = profAlertVisible ? "block" : "none";
+  if(!profAlertVisible) return;
+
+  document.getElementById("profAlertSubtitle").textContent =
+    `${profNewlyInactive.length} estudiante${profNewlyInactive.length===1?"":"s"} tuyo${profNewlyInactive.length===1?"":"s"} quedó Suspendido esta semana (antes estaba Activo o ASP).`;
+  document.getElementById("profAlertList").innerHTML = profNewlyInactive.map(s=>`
+    <div class="alert-row">
+      <span>${escapeHTML(s.name)} — grupo ${escapeHTML(s.groupCode||"—")}</span>
+      <span class="status-pill ${(s.currentStatus||"sindatos").toLowerCase().replace(/\s+/g,"")}">${escapeHTML(s.currentStatus||"Sin reporte")}</span>
+    </div>
+  `).join("") || `<p class="small-note">Sin novedades.</p>`;
 }
 
 async function refreshProfPanel(){
   try{
-    const data = await apiGet({ action:"profData", profId: profSession.profId, pin: profSession.pin });
+    const data = await apiGet({ action:"profData", profId: profSession.profId, pin: profSession.pin, period: profSession.period });
     if(!data.ok){ alert("Tu sesión ya no es válida. Vuelve a iniciar sesión."); logoutProf(); return; }
     renderProfPanel(data);
-    await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública
+    if(profSession.period === currentPeriod) await loadPublicState(); // mantiene actualizados los cupos que se muestran en la vista pública, si aplica al mismo periodo
   }catch(e){
     alert("No se pudo actualizar el panel. Intenta de nuevo.");
   }
+}
+
+// Genera el HTML del tag de color con el estado semanal (Activo/ASP/Suspendido/sin dato).
+function statusPillHTML_(status){
+  if(!status) return `<span class="status-pill sindatos">Sin reporte</span>`;
+  const cls = status.toLowerCase().replace(/\s+/g,"");
+  return `<span class="status-pill ${cls}">${escapeHTML(status)}</span>`;
 }
 
 function renderProfTable(resetSelection){
@@ -1523,7 +1831,7 @@ function renderProfTable(resetSelection){
           ${idx===0?`<td rowspan="${g.students.length}"><input type="checkbox" class="merge-check" data-group="${escapeHTML(g.id)}" ${checked} onchange="onGroupCheckChange(this, profMergeSelection, 'profMergeCount', 'profMergeBtn')"></td>`:""}
           <td>${idx===0?escapeHTML(g.groupCode||"—"):""}</td>
           <td>${idx===0?escapeHTML(g.groupTitle||"—"):""}</td>
-          <td>${escapeHTML(s.name)}</td>
+          <td>${escapeHTML(s.name)} ${statusPillHTML_(s.weeklyStatus)}</td>
           <td>${escapeHTML(s.code)}</td>
           <td>${escapeHTML(s.cedula)}</td>
           <td>${escapeHTML(s.email)}</td>
@@ -1540,6 +1848,105 @@ function renderProfTable(resetSelection){
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+/* =========================================================
+   ASISTENCIA Y GRABACIONES (panel profesor)
+========================================================= */
+function populateAttendanceWeekSelect(){
+  const sel = document.getElementById("attendanceWeekSelect");
+  const current = sel.value;
+  let options = "";
+  for(let i=1;i<=16;i++){
+    options += `<option value="${i}">Semana ${i}</option>`;
+  }
+  sel.innerHTML = options;
+  // por defecto, la semana más reciente para la que hay reporte de matrícula (si existe), si no la 1
+  sel.value = current || "1";
+}
+
+function renderAttendanceSection(){
+  const wrap = document.getElementById("attendanceWrap");
+  const week = parseInt(document.getElementById("attendanceWeekSelect").value, 10) || 1;
+
+  if(profGroupsData.length===0){
+    wrap.innerHTML = `<div class="empty-state">Todavía no tienes grupos asignados.</div>`;
+    return;
+  }
+
+  wrap.innerHTML = "";
+  profGroupsData.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
+  .forEach(g=>{
+    const saved = (profAttendanceData[g.id] && profAttendanceData[g.id][week]) || { link:"", students:{} };
+    const box = document.createElement("div");
+    box.className = "attendance-group sans";
+    const studentRowsHTML = g.students.map(s=>{
+      const attended = saved.students[String(s.cedula).trim()] === true;
+      return `
+        <div class="attendance-student-row">
+          <input type="checkbox" class="attendance-check" data-cedula="${escapeHTML(s.cedula)}" ${attended?"checked":""}>
+          <span>${escapeHTML(s.name)}</span>
+        </div>
+      `;
+    }).join("");
+    box.innerHTML = `
+      <h4>${escapeHTML(g.groupCode||"—")} — ${escapeHTML(g.groupTitle||"Pendiente")}</h4>
+      <label>Link de la grabación (semana ${week})</label>
+      <input type="text" class="attendance-link-input" placeholder="https://…" value="${escapeHTML(saved.link||"")}">
+      <div style="margin-top:10px;">
+        ${studentRowsHTML}
+      </div>
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="saveAttendanceForGroup('${escapeHTML(g.id)}', this)">Guardar asistencia de esta semana</button>
+      </div>
+      <div class="attendance-msg"></div>
+    `;
+    wrap.appendChild(box);
+  });
+}
+
+async function saveAttendanceForGroup(groupId, btn){
+  const box = btn.closest(".attendance-group");
+  const week = parseInt(document.getElementById("attendanceWeekSelect").value, 10) || 1;
+  const link = box.querySelector(".attendance-link-input").value.trim();
+  const attendance = Array.from(box.querySelectorAll(".attendance-check")).map(chk=>({
+    cedula: chk.dataset.cedula,
+    asistio: chk.checked
+  }));
+  const msgEl = box.querySelector(".attendance-msg");
+  msgEl.innerHTML = "";
+
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = "Guardando…";
+
+  try{
+    const result = await apiPost({
+      action: "profSaveAttendance",
+      profId: profSession.profId,
+      pin: profSession.pin,
+      period: profSession.period,
+      groupId,
+      week,
+      link,
+      attendance
+    });
+    if(result.error){
+      msgEl.innerHTML = `<div class="msg error">${escapeHTML(result.error)}</div>`;
+      return;
+    }
+    msgEl.innerHTML = `<div class="msg success">Guardado.</div>`;
+    // actualiza el estado local sin recargar todo el panel
+    if(!profAttendanceData[groupId]) profAttendanceData[groupId] = {};
+    const studentsMap = {};
+    attendance.forEach(a=>{ studentsMap[String(a.cedula).trim()] = a.asistio; });
+    profAttendanceData[groupId][week] = { link, students: studentsMap };
+  }catch(e){
+    msgEl.innerHTML = `<div class="msg error">No se pudo guardar. Intenta de nuevo.</div>`;
+  }finally{
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 async function combineProfGroups(){
@@ -1568,6 +1975,7 @@ async function combineProfGroups(){
       action: "profMergeStudents",
       profId: profSession.profId,
       pin: profSession.pin,
+      period: profSession.period,
       students: allStudents.map(s=>({ groupId:s.groupId, cedula:s.cedula, code:s.code })),
       groupTitle: title
     });
@@ -1591,7 +1999,7 @@ async function saveProfessorsFromText(){
     return;
   }
   try{
-    const result = await apiPost({ action:"adminSaveProfessors", key: ADMIN_KEY, professors: parsed });
+    const result = await apiPost({ action:"adminSaveProfessors", key: ADMIN_KEY, professors: parsed, period: adminSelectedPeriod });
     if(result.error){ alert("Error: "+result.error); return; }
     alert(`Listado de profesores actualizado (${result.count} registros).`);
     await renderAdmin();
@@ -1612,7 +2020,7 @@ async function saveStudentsFromText(){
     return;
   }
   try{
-    const result = await apiPost({ action:"adminSaveStudents", key: ADMIN_KEY, students: parsed });
+    const result = await apiPost({ action:"adminSaveStudents", key: ADMIN_KEY, students: parsed, period: adminSelectedPeriod });
     if(result.error){ alert("Error: "+result.error); return; }
     document.getElementById("studentDbCount").textContent = result.total;
     document.getElementById("studentTextarea").value = "";
@@ -1634,7 +2042,7 @@ async function savePrereqFromText(){
     return;
   }
   try{
-    const result = await apiPost({ action:"adminSavePrereq", key: ADMIN_KEY, records: parsed });
+    const result = await apiPost({ action:"adminSavePrereq", key: ADMIN_KEY, records: parsed, period: adminSelectedPeriod });
     if(result.error){ alert("Error: "+result.error); return; }
     document.getElementById("prereqDbCount").textContent = result.total;
     document.getElementById("prereqTextarea").value = "";
@@ -1644,10 +2052,58 @@ async function savePrereqFromText(){
   }
 }
 
+/* =========================================================
+   REPORTE SEMANAL DE MATRÍCULA (admin)
+========================================================= */
+function populateWeeklyStatusWeekSelect(weeksUploaded){
+  const sel = document.getElementById("weeklyStatusWeekSelect");
+  const current = sel.value;
+  let options = "";
+  for(let i=1;i<=16;i++){
+    const done = weeksUploaded.indexOf(i) !== -1;
+    options += `<option value="${i}">Semana ${i}${done?" — ya cargada":""}</option>`;
+  }
+  sel.innerHTML = options;
+  sel.value = current || String(weeksUploaded.length ? Math.min(16, weeksUploaded[weeksUploaded.length-1]+1) : 1);
+  document.getElementById("weeklyStatusUploadedInfo").textContent =
+    weeksUploaded.length ? `Semanas ya cargadas en este periodo: ${weeksUploaded.join(", ")}.` : "Todavía no se ha cargado ninguna semana en este periodo.";
+}
+
+function parseWeeklyStatusText(text){
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  return lines.map(line=>{
+    const parts = line.split("|").map(p=>p.trim());
+    return { cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", estado: parts[3]||"" };
+  }).filter(s=>s.cedula && s.estado);
+}
+
+async function saveWeeklyStatusFromText(){
+  const week = parseInt(document.getElementById("weeklyStatusWeekSelect").value, 10);
+  const text = document.getElementById("weeklyStatusTextarea").value.trim();
+  if(!text){
+    alert("Pega el reporte de la semana primero (una línea por estudiante).");
+    return;
+  }
+  const parsed = parseWeeklyStatusText(text);
+  if(parsed.length===0){
+    alert("No se reconoció ningún registro válido. Revisa el formato: Cédula | ID | Nombre | Estado.");
+    return;
+  }
+  try{
+    const result = await apiPost({ action:"adminSaveWeeklyStatus", key: ADMIN_KEY, period: adminSelectedPeriod, week, records: parsed });
+    if(result.error){ alert("Error: "+result.error); return; }
+    document.getElementById("weeklyStatusTextarea").value = "";
+    alert(`Reporte de la semana ${result.week} guardado. ${result.updated} registros procesados.`);
+    await renderAdmin();
+  }catch(e){
+    alert("No se pudo guardar el reporte. Si es un archivo grande, pégalo en bloques más pequeños.");
+  }
+}
+
 async function resetEnrollments(){
   if(!confirm("Esto borrará TODAS las inscripciones de forma permanente. ¿Continuar?")) return;
   try{
-    const result = await apiPost({ action:"adminResetEnrollments", key: ADMIN_KEY });
+    const result = await apiPost({ action:"adminResetEnrollments", key: ADMIN_KEY, period: adminSelectedPeriod });
     if(result.error){ alert("Error: "+result.error); return; }
     await renderAdmin();
   }catch(e){
@@ -1733,6 +2189,7 @@ function switchView(name){
       `<div class="empty-state">Falta configurar la conexión al backend.<br>Abre este archivo y reemplaza API_URL con la URL de tu Apps Script.</div>`;
     return;
   }
+  await loadPeriods();
   await loadPublicState();
   renderStatusBar();
   renderProfGrid();
