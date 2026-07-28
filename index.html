@@ -267,6 +267,7 @@
     white-space:nowrap;
   }
   .status-pill.activo{ background:#e5f3ea; color:#1f7a41; }
+  .status-pill.sello{ background:#e3edf7; color:#2a5c8a; }
   .status-pill.asp{ background:var(--accent-soft); color:var(--accent); }
   .status-pill.suspendido{ background:var(--danger-soft); color:var(--danger); }
   .status-pill.sindatos{ background:var(--paper); color:var(--ink-soft); }
@@ -305,6 +306,32 @@
     width:16px;
     height:16px;
     cursor:pointer;
+  }
+
+  .week-tracker{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:150px;
+  }
+  .week-tracker strong{
+    font-size:0.78rem;
+    color:var(--ink);
+  }
+  .week-dots{
+    display:flex;
+    flex-wrap:wrap;
+    gap:3px;
+  }
+  .week-dot{
+    width:9px;
+    height:9px;
+    border-radius:50%;
+    background:var(--line);
+    display:inline-block;
+  }
+  .week-dot.attended{
+    background:var(--accent);
   }
 
   .panel{
@@ -727,6 +754,7 @@
       <strong>Panel administrador</strong>
       <span style="flex:1"></span>
       <button class="secondary" onclick="exportCSV()">Descargar sábana (CSV)</button>
+      <button class="secondary" onclick="exportAttendanceCSV()">Descargar consolidado de asesorías (CSV)</button>
       <button class="secondary" onclick="switchView('public')">Ver vista pública</button>
       <button class="danger-btn" onclick="logout()">Salir</button>
     </div>
@@ -821,7 +849,7 @@
       <p class="small-note">Sube, una vez por semana, el estado de matrícula de los estudiantes (Activo, ASP o Suspendido). Con esto, cada profesor ve un tag de estado junto a sus estudiantes y recibe alerta si alguno se inactivó respecto a la semana anterior.</p>
       <label for="weeklyStatusWeekSelect">Semana</label>
       <select id="weeklyStatusWeekSelect"></select>
-      <p class="small-note" style="margin-top:8px;">Formato: una línea por estudiante → <code>Cédula | ID/Código | Nombre completo | Estado</code>. El estado debe ser exactamente <strong>Activo</strong>, <strong>ASP</strong> (Autorizado para Asistir) o <strong>Suspendido</strong>.</p>
+      <p class="small-note" style="margin-top:8px;">Formato: una línea por estudiante → <code>Cédula | ID/Código | Nombre completo | Estado</code>. El estado debe ser exactamente <strong>Activo</strong>, <strong>Sello</strong> (sello financiero), <strong>ASP</strong> (Autorizado para Asistir) o <strong>Suspendido</strong>.</p>
       <textarea id="weeklyStatusTextarea" placeholder="1000123456 | EST-0231 | Juana Pérez Gómez | Activo"></textarea>
       <div style="margin-top:10px;">
         <button class="primary" onclick="saveWeeklyStatusFromText()">Guardar reporte de esta semana</button>
@@ -863,6 +891,7 @@ let adminSelectedPeriod = null; // periodo que el admin está administrando ahor
 let professors = [];      // {id, name, area, quota, remaining} — SOLO vista pública (con cupos calculados)
 let adminProfessors = []; // {id, name, area, quota, pin} — SOLO panel admin (edición/listado, sin "remaining")
 let adminQuotaSummary = []; // {id, name, area, quota, remaining} — para el panel de cupos por profesor
+let adminAttendanceData = {}; // { <groupId>: { <semana>: { link, students: { cedula: true/false } } } } — de TODOS los grupos del periodo, para el consolidado
 let enrollments = [];      // solo se carga en el panel admin: {id, groupCode, profId, profName, timestamp, students}
 let studentDBRaw = [];      // solo panel admin: filas crudas de la hoja Estudiantes, para previsualizar
 let prereqDBRaw = [];       // solo panel admin: filas crudas de Fundamentos de Investigación, para previsualizar
@@ -952,6 +981,7 @@ async function loadAdminData(){
     enrollments = data.enrollments || [];
     studentDBRaw = data.students || [];
     prereqDBRaw = data.prereq || [];
+    adminAttendanceData = data.attendance || {};
     document.getElementById("studentDbCount").textContent = data.studentCount || 0;
     document.getElementById("prereqDbCount").textContent = data.prereqCount || 0;
     populateWeeklyStatusWeekSelect(data.weeksUploaded || []);
@@ -1801,6 +1831,22 @@ function statusPillHTML_(status){
   return `<span class="status-pill ${cls}">${escapeHTML(status)}</span>`;
 }
 
+// Genera el contador visual de semanas asistidas: un punto por cada una de
+// las 16 semanas, relleno si el estudiante asistió esa semana (según lo que
+// el propio profesor ya marcó en "Asistencia y grabaciones").
+function weekTrackerHTML_(groupId, cedula){
+  const ced = String(cedula||"").trim();
+  let attendedCount = 0;
+  let dots = "";
+  for(let w=1; w<=16; w++){
+    const weekData = profAttendanceData[groupId] && profAttendanceData[groupId][w];
+    const attended = !!(weekData && weekData.students && weekData.students[ced] === true);
+    if(attended) attendedCount++;
+    dots += `<span class="week-dot ${attended?"attended":""}" title="Semana ${w}${attended?" — asistió":" — sin registrar/no asistió"}"></span>`;
+  }
+  return `<div class="week-tracker"><strong>${attendedCount}/16 semanas</strong><div class="week-dots">${dots}</div></div>`;
+}
+
 function renderProfTable(resetSelection){
   if(resetSelection===undefined) resetSelection = true;
   const wrap = document.getElementById("profTableWrap");
@@ -1821,7 +1867,7 @@ function renderProfTable(resetSelection){
 
   let rows = "";
   if(filtered.length===0){
-    rows = `<tr><td colspan="7" style="text-align:center; color:var(--ink-soft); padding:20px;">Sin resultados para "${escapeHTML(term)}".</td></tr>`;
+    rows = `<tr><td colspan="8" style="text-align:center; color:var(--ink-soft); padding:20px;">Sin resultados para "${escapeHTML(term)}".</td></tr>`;
   }else{
     filtered.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
     .forEach(g=>{
@@ -1835,6 +1881,7 @@ function renderProfTable(resetSelection){
           <td>${escapeHTML(s.code)}</td>
           <td>${escapeHTML(s.cedula)}</td>
           <td>${escapeHTML(s.email)}</td>
+          <td>${weekTrackerHTML_(g.id, s.cedula)}</td>
         </tr>`;
       });
     });
@@ -1843,7 +1890,7 @@ function renderProfTable(resetSelection){
   wrap.innerHTML = `
     <table>
       <thead>
-        <tr><th title="Selecciona el grupo completo">Grupo</th><th>Código grupo</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th></tr>
+        <tr><th title="Selecciona el grupo completo">Grupo</th><th>Código grupo</th><th>Título propuesta</th><th>Nombre estudiante</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Asistencia</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1941,6 +1988,7 @@ async function saveAttendanceForGroup(groupId, btn){
     const studentsMap = {};
     attendance.forEach(a=>{ studentsMap[String(a.cedula).trim()] = a.asistio; });
     profAttendanceData[groupId][week] = { link, students: studentsMap };
+    renderProfTable(false); // refresca el contador de semanas asistidas sin perder la selección de fusión
   }catch(e){
     msgEl.innerHTML = `<div class="msg error">No se pudo guardar. Intenta de nuevo.</div>`;
   }finally{
@@ -2135,6 +2183,57 @@ function exportCSV(){
   const a = document.createElement("a");
   a.href = url;
   a.download = `sabana_matricula_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Consolidado de asesorías: una fila por estudiante con su asistencia
+// semana a semana (1 a 16) y los links de grabación de las sesiones en que
+// quedaron registrados, para TODOS los grupos del periodo que el admin
+// está administrando (no solo los de un profesor).
+function exportAttendanceCSV(){
+  if(enrollments.length===0){
+    alert("No hay inscripciones para exportar.");
+    return;
+  }
+  const header = ["Código grupo","Profesor","Título propuesta","Nombre estudiante","ID","Cédula","Correo","Semanas asistidas"];
+  for(let w=1; w<=16; w++) header.push(`Semana ${w}`);
+  header.push("Links de grabación por semana");
+  const lines = [header.join(",")];
+
+  enrollments.slice().sort((a,b)=> (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(e=>{
+    const groupAttendance = adminAttendanceData[e.id] || {};
+    const linkParts = [];
+    for(let w=1; w<=16; w++){
+      if(groupAttendance[w] && groupAttendance[w].link){
+        linkParts.push(`Semana ${w}: ${groupAttendance[w].link}`);
+      }
+    }
+    const linksSummary = linkParts.join(" | ");
+
+    e.students.forEach(s=>{
+      const ced = String(s.cedula||"").trim();
+      let attendedCount = 0;
+      const weekCells = [];
+      for(let w=1; w<=16; w++){
+        const attended = !!(groupAttendance[w] && groupAttendance[w].students && groupAttendance[w].students[ced] === true);
+        if(attended) attendedCount++;
+        weekCells.push(attended ? "SI" : "");
+      }
+      const row = [
+        csvSafe(e.groupCode||""), csvSafe(e.profName), csvSafe(e.groupTitle||""),
+        csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula), csvSafe(s.email),
+        `${attendedCount}/16`
+      ].concat(weekCells.map(csvSafe)).concat([csvSafe(linksSummary)]);
+      lines.push(row.join(","));
+    });
+  });
+
+  const blob = new Blob(["\uFEFF"+lines.join("\n")], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `consolidado_asesorias_${adminSelectedPeriod}_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
