@@ -338,7 +338,7 @@
     <div class="panel instructivo">
       <h2>Instrucciones</h2>
       <ol>
-        <li>Este formulario sirve para <strong>conformar y registrar tu grupo de trabajo de grado</strong> en la modalidad Proyecto Particular. Los grupos que se registren aquí quedan asignados al <strong>mismo docente asesor</strong>.</li>
+        <li>Este formulario sirve únicamente para <strong>conformar y registrar tu grupo de trabajo de grado</strong> en la modalidad Proyecto Particular. La asignación del docente asesor se resolverá en otro momento, fuera de este formulario.</li>
         <li>El grupo puede tener entre 1 y 3 integrantes. Basta con que <strong>un solo integrante</strong> diligencie el formulario por todos.</li>
         <li>Para cada integrante, escribe su <strong>ID</strong> o su <strong>cédula</strong> — con uno de los dos basta. El nombre, el correo y el estado de aprobación se cargan automáticamente.</li>
         <li>Solo pueden matricular esta modalidad quienes <strong>aprobaron el curso de Fundamentos y Enfoques de Investigación Social y Educativa</strong> en el periodo anterior. El sistema lo valida y lo muestra en verde o en rojo.</li>
@@ -363,7 +363,7 @@
     <div class="panel confirm-panel" id="confirmPanel" style="display:none;">
       <p class="lead">Tu grupo quedó registrado con el código:</p>
       <div class="big-code" id="bigCode"></div>
-      <p class="note">Guarda este código como comprobante. Su docente asesor será <strong id="asesorNombre"></strong>. Recuerda asistir a la sesión general de orientaciones del curso de Investigación Acción esta semana.</p>
+      <p class="note">Guarda este código como comprobante. Recuerda asistir a la sesión general de orientaciones del curso de Investigación Acción esta semana.</p>
     </div>
 
     <div class="admin-link"><a onclick="switchView('adminGate')">Panel administrador</a></div>
@@ -410,12 +410,41 @@
       </div>
       <div id="groupsTableWrap"></div>
     </div>
+
+    <div class="panel">
+      <h3 class="section-title">Asignar asesor a grupos seleccionados</h3>
+      <p class="hint">Marca entre 1 y 20 grupos en la tabla de arriba, escribe el nombre del asesor y genera el archivo de inscripción. Seleccionados: <strong id="selectedCount">0</strong> / 20.</p>
+      <label for="advisorNameInput" style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Nombre del asesor</label>
+      <input type="text" id="advisorNameInput" placeholder="Ej: María Fernanda Gómez" style="width:100%; max-width:360px; padding:9px 10px; border:1px solid var(--line); border-radius:7px; font-family:var(--font); font-size:0.88rem; margin-bottom:12px;">
+      <div>
+        <button class="primary" onclick="assignAdvisorAndExport()">Asignar y generar archivo de inscripción</button>
+      </div>
+      <div id="assignMsg"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="section-title">Registrar grupo manualmente (anula validación de Fundamentos)</h3>
+      <p class="hint">Úsalo solo para casos especiales. No se valida contra la base de aprobados de Fundamentos, pero sí se revisa que nadie quede duplicado en otro grupo. Cada registro queda marcado como "Manual" en la tabla.</p>
+
+      <label style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Cargar archivo MAFI (CSV) para extraer los datos automáticamente</label>
+      <input type="file" id="mafiFileInput" accept=".csv" onchange="handleMafiFileUpload(event)" style="font-family:var(--font); font-size:0.85rem; margin-bottom:6px;">
+      <div id="mafiFileStatus" class="hint" style="margin-bottom:14px;"></div>
+
+      <p class="hint">Escribe la cédula de cada integrante: si el archivo MAFI está cargado, el nombre, ID y correo se completan solos. Si no se encuentra ahí, puedes escribirlos manualmente.</p>
+      <div class="members-grid" id="manualMembersGrid"></div>
+      <div class="actions" style="justify-content:flex-start; margin-top:14px;">
+        <button class="primary" onclick="submitManualGroup()">Registrar grupo manual</button>
+        <button class="secondary" onclick="initManualForm()">Limpiar</button>
+      </div>
+      <div id="manualGroupMsg"></div>
+    </div>
   </div>
 
 </div>
 
+
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbx5phz8cT-QoBo14usLUPCQJG3rznAD1lnVqYJmNkKRyLoPQX_EOow0tMx9J25puwAt/exec";
+const API_URL = "PEGAR_AQUI_LA_URL_DE_APPS_SCRIPT";
 const ADMIN_KEY = "c24b6ce89062a936"; // debe coincidir con ADMIN_KEY en Code.gs
 const MAX_GROUP_SIZE = 3;
 
@@ -600,7 +629,6 @@ async function submitGroup(){
       return;
     }
     document.getElementById("bigCode").textContent = result.groupCode;
-    document.getElementById("asesorNombre").textContent = result.asesor || "";
     document.getElementById("formPanel").style.display = "none";
     document.getElementById("confirmPanel").style.display = "block";
   }catch(e){
@@ -618,6 +646,7 @@ function tryLogin(){
     adminKeyEntered = val;
     switchView("admin");
     loadAdminData();
+    initManualForm();
   }else{
     msg.innerHTML = `<div class="msg error">Clave incorrecta.</div>`;
   }
@@ -633,6 +662,203 @@ async function loadAdminData(){
   window._lastGroups = data.groups;
 }
 
+function buildManualMemberBox(idx){
+  const box = document.createElement("div");
+  box.className = "member-box";
+  box.innerHTML = `
+    <div class="member-label">Integrante ${idx}${idx>1 ? " (opcional)" : ""}</div>
+    <div>
+      <label>Cédula${idx===1 ? " *" : ""}</label>
+      <input type="text" class="manual-ced-input" placeholder="Ej: 1000100001" oninput="onManualCedulaInput(this)">
+    </div>
+    <div>
+      <label>Nombre completo${idx===1 ? " *" : ""}</label>
+      <input type="text" class="manual-name-input" placeholder="Ej: Ana María Rojas Cárdenas">
+    </div>
+    <div>
+      <label>ID (opcional)</label>
+      <input type="text" class="manual-code-input" placeholder="Ej: 100249535">
+    </div>
+    <div>
+      <label>Correo (opcional)</label>
+      <input type="text" class="manual-email-input" placeholder="Ej: correo@estudiante.ibero.edu.co">
+    </div>
+    <div class="status-tag" data-mafi-status style="display:none;"></div>
+  `;
+  return box;
+}
+
+/* ===================== CARGA DE ARCHIVO MAFI (CSV) ===================== */
+window._mafiRecords = null; // Map: cedula -> {cedula, code, name, email}
+
+function parseCSVLine_(line){
+  // Parser CSV simple que respeta comillas dobles
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const c = line[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; }
+        else { inQuotes = false; }
+      } else { cur += c; }
+    } else {
+      if(c === '"'){ inQuotes = true; }
+      else if(c === ','){ result.push(cur); cur = ""; }
+      else { cur += c; }
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function findColumn_(headers, candidates){
+  const lower = headers.map(h => h.trim().toUpperCase());
+  for(const cand of candidates){
+    const idx = lower.indexOf(cand.toUpperCase());
+    if(idx !== -1) return idx;
+  }
+  return -1;
+}
+
+function handleMafiFileUpload(event){
+  const file = event.target.files[0];
+  const statusEl = document.getElementById("mafiFileStatus");
+  if(!file){ return; }
+  statusEl.textContent = "Leyendo archivo...";
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const text = e.target.result;
+      const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
+      if(lines.length < 2){
+        statusEl.textContent = "El archivo no tiene datos legibles.";
+        return;
+      }
+      const headers = parseCSVLine_(lines[0]);
+      const idxCedula = findColumn_(headers, ["IDENTIFICACION", "CEDULA"]);
+      const idxIdBanner = findColumn_(headers, ["IDBANNER", "ID_BANNER"]);
+      const idxUsuario = findColumn_(headers, ["USUARIO"]);
+      const idxNombreCompleto = findColumn_(headers, ["NOMBRE", "NOMBRE_COMPLETO", "ESTUDIANTE"]);
+      const idxPrimerApellido = findColumn_(headers, ["PRIMER_APELLIDO"]);
+      const idxSegundoApellido = findColumn_(headers, ["SEGUNDO_APELLIDO"]);
+      const idxPrimerNombre = findColumn_(headers, ["PRIMER_NOMBRE"]);
+      const idxSegundoNombre = findColumn_(headers, ["SEGUNDO_NOMBRE"]);
+      const idxEmailInst = findColumn_(headers, ["EMAIL_INSTITUCIONAL", "CORREO_INSTITUCIONAL"]);
+      const idxEmailPers = findColumn_(headers, ["EMAIL_PERSONAL", "CORREO_PERSONAL", "CORREO"]);
+
+      if(idxCedula === -1){
+        statusEl.innerHTML = `<span style="color:var(--danger);">No se encontró una columna de cédula/identificación en el archivo.</span>`;
+        return;
+      }
+
+      const records = {};
+      for(let i=1;i<lines.length;i++){
+        const cols = parseCSVLine_(lines[i]);
+        const cedula = (cols[idxCedula] || "").trim();
+        if(!cedula) continue;
+
+        let name = "";
+        if(idxNombreCompleto !== -1) name = (cols[idxNombreCompleto] || "").trim();
+        if(!name){
+          const parts = [idxPrimerApellido, idxSegundoApellido, idxPrimerNombre, idxSegundoNombre]
+            .map(ix => ix !== -1 ? (cols[ix] || "").trim() : "")
+            .filter(Boolean);
+          name = parts.join(" ");
+        }
+
+        const code = idxIdBanner !== -1 ? (cols[idxIdBanner] || "").trim() : (idxUsuario !== -1 ? (cols[idxUsuario] || "").trim() : "");
+        const email = (idxEmailInst !== -1 && (cols[idxEmailInst] || "").trim())
+          ? (cols[idxEmailInst] || "").trim()
+          : (idxEmailPers !== -1 ? (cols[idxEmailPers] || "").trim() : "");
+
+        records[cedula] = { cedula, code, name, email };
+      }
+
+      window._mafiRecords = records;
+      statusEl.innerHTML = `<span style="color:var(--success);">Archivo cargado: ${Object.keys(records).length} registros. Escribe una cédula abajo para autocompletar.</span>`;
+
+      document.querySelectorAll(".manual-ced-input").forEach(input => {
+        if(input.value.trim()) onManualCedulaInput(input);
+      });
+    }catch(err){
+      statusEl.innerHTML = `<span style="color:var(--danger);">No se pudo leer el archivo. Verifica que sea un CSV.</span>`;
+    }
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+function onManualCedulaInput(input){
+  const box = input.closest(".member-box");
+  const cedula = input.value.trim();
+  const statusTag = box.querySelector("[data-mafi-status]");
+  const nameInput = box.querySelector(".manual-name-input");
+  const codeInput = box.querySelector(".manual-code-input");
+  const emailInput = box.querySelector(".manual-email-input");
+
+  if(!window._mafiRecords || !cedula){
+    statusTag.style.display = "none";
+    return;
+  }
+
+  const found = window._mafiRecords[cedula];
+  if(found){
+    if(!nameInput.value.trim()) nameInput.value = found.name;
+    if(!codeInput.value.trim()) codeInput.value = found.code;
+    if(!emailInput.value.trim()) emailInput.value = found.email;
+    statusTag.style.display = "block";
+    statusTag.className = "status-tag ok";
+    statusTag.textContent = "Encontrado en el archivo MAFI cargado.";
+  }else{
+    statusTag.style.display = "block";
+    statusTag.className = "status-tag pending";
+    statusTag.textContent = "No se encontró en el archivo MAFI — completa los datos manualmente.";
+  }
+}
+
+function initManualForm(){
+  const grid = document.getElementById("manualMembersGrid");
+  grid.innerHTML = "";
+  for(let i=1;i<=MAX_GROUP_SIZE;i++){
+    grid.appendChild(buildManualMemberBox(i));
+  }
+  document.getElementById("manualGroupMsg").innerHTML = "";
+}
+
+async function submitManualGroup(){
+  const msg = document.getElementById("manualGroupMsg");
+  msg.innerHTML = "";
+
+  const boxes = Array.from(document.querySelectorAll("#manualMembersGrid .member-box"));
+  const students = boxes.map(b => ({
+    cedula: b.querySelector(".manual-ced-input").value.trim(),
+    name: b.querySelector(".manual-name-input").value.trim(),
+    code: b.querySelector(".manual-code-input").value.trim(),
+    email: b.querySelector(".manual-email-input").value.trim()
+  })).filter(s => s.cedula || s.name);
+
+  if(students.length < 1){
+    msg.innerHTML = `<div class="msg error">Completa al menos cédula y nombre del Integrante 1.</div>`;
+    return;
+  }
+  if(students.some(s => !s.cedula || !s.name)){
+    msg.innerHTML = `<div class="msg error">Cada integrante que diligencies necesita cédula y nombre completos.</div>`;
+    return;
+  }
+
+  const result = await apiPost({ action:"adminRegisterGroup", key: adminKeyEntered, students });
+  if(result.error){
+    msg.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`;
+    return;
+  }
+
+  msg.innerHTML = `<div class="msg success">Grupo manual registrado con código ${escapeHTML(result.groupCode)}.</div>`;
+  initManualForm();
+  loadAdminData();
+}
+
 function renderGroupsTable(groups){
   const wrap = document.getElementById("groupsTableWrap");
   if(groups.length === 0){
@@ -644,21 +870,78 @@ function renderGroupsTable(groups){
   .forEach(g => {
     g.students.forEach((s, idx) => {
       rows += `<tr>
-        <td>${idx===0 ? escapeHTML(g.groupCode||"—") : ""}</td>
+        <td>${idx===0 ? `<input type="checkbox" class="group-checkbox" value="${escapeHTML(g.id)}" onchange="updateSelectedCount()">` : ""}</td>
+        <td>${idx===0 ? escapeHTML(g.groupCode||"—") + (g.manual ? ` <span style="color:var(--warn); font-size:0.72rem; font-weight:700;">MANUAL</span>` : "") : ""}</td>
         <td>${escapeHTML(s.name)}</td>
         <td>${escapeHTML(s.code)}</td>
         <td>${escapeHTML(s.cedula)}</td>
         <td>${escapeHTML(s.email)}</td>
         <td>${idx===0 ? new Date(g.timestamp).toLocaleString("es-CO") : ""}</td>
+        <td>${idx===0 ? (g.asesor ? escapeHTML(g.asesor) : "<em style='color:var(--ink-soft);'>Sin asignar</em>") : ""}</td>
         <td>${idx===0 ? `<button class="danger-btn" onclick="deleteGroup('${g.id}')">Eliminar grupo</button>` : ""}</td>
       </tr>`;
     });
   });
   wrap.innerHTML = `
     <table>
-      <thead><tr><th>Código</th><th>Nombre</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha</th><th></th></tr></thead>
+      <thead><tr><th></th><th>Código</th><th>Nombre</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha</th><th>Asesor asignado</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  updateSelectedCount();
+}
+
+function updateSelectedCount(){
+  const checked = document.querySelectorAll(".group-checkbox:checked").length;
+  const counterEl = document.getElementById("selectedCount");
+  if(counterEl) counterEl.textContent = checked;
+}
+
+async function assignAdvisorAndExport(){
+  const msg = document.getElementById("assignMsg");
+  msg.innerHTML = "";
+
+  const checkedBoxes = Array.from(document.querySelectorAll(".group-checkbox:checked"));
+  const groupIds = checkedBoxes.map(cb => cb.value);
+  const asesor = document.getElementById("advisorNameInput").value.trim();
+
+  if(groupIds.length < 1 || groupIds.length > 20){
+    msg.innerHTML = `<div class="msg error">Debes seleccionar entre 1 y 20 grupos (seleccionados: ${groupIds.length}).</div>`;
+    return;
+  }
+  if(!asesor){
+    msg.innerHTML = `<div class="msg error">Escribe el nombre del asesor.</div>`;
+    return;
+  }
+
+  const result = await apiPost({ action:"adminAssignAdvisor", key: adminKeyEntered, groupIds, asesor });
+  if(result.error){
+    msg.innerHTML = `<div class="msg error">${escapeHTML(result.error)}</div>`;
+    return;
+  }
+
+  msg.innerHTML = `<div class="msg success">Asesor asignado a ${result.rowsUpdated} integrante(s) en ${groupIds.length} grupo(s).</div>`;
+
+  await loadAdminData();
+  exportInscripcionCSV(groupIds, asesor);
+}
+
+function exportInscripcionCSV(groupIds, asesor){
+  const idsSet = new Set(groupIds);
+  const groups = (window._lastGroups || []).filter(g => idsSet.has(g.id));
+  const header = ["Código grupo","Asesor asignado","Nombre estudiante","ID","Cédula","Correo","Fecha registro"];
+  const lines = [header.join(",")];
+  groups.slice().sort((a,b) => (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(g => {
+    g.students.forEach(s => {
+      lines.push([csvSafe(g.groupCode||""), csvSafe(asesor), csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula), csvSafe(s.email), new Date(g.timestamp).toLocaleString("es-CO")].join(","));
+    });
+  });
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `inscripcion_${asesor.replace(/\s+/g,"_")}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function saveStudents(){
