@@ -399,7 +399,7 @@
 
     <div class="panel">
       <h3 class="section-title">Base de estudiantes habilitados</h3>
-      <p class="hint">Pega la tabla copiada directamente del Excel de Fundamentos (con encabezados; aprueba quien tenga nota ≥ 3.5), o una línea por estudiante en formato <code>Cédula | ID | Nombre completo | Correo | Aprobó (SI/NO)</code>. Base actual: <strong id="studentDbCount">0</strong> estudiantes (<strong id="studentApprovedCount">0</strong> aprobados).</p>
+      <p class="hint">Pega la tabla copiada directamente del Excel de Fundamentos (con encabezados: lista de Fundamentos o reporte de notas de la plataforma; aprueba quien tenga nota ≥ 3.5, redondeada a un decimal), o una línea por estudiante en formato <code>Cédula | ID | Nombre completo | Correo | Aprobó (SI/NO)</code>. Base actual: <strong id="studentDbCount">0</strong> estudiantes (<strong id="studentApprovedCount">0</strong> aprobados).</p>
       <textarea id="studentTextarea" placeholder="1000123456 | 100256295 | JUANA PÉREZ GÓMEZ | jperez@estudiante.ibero.edu.co | SI"></textarea>
       <div style="margin-top:10px;">
         <button class="primary" onclick="saveStudents()">Guardar base de estudiantes</button>
@@ -1056,14 +1056,15 @@ function parseStudentsText_(text){
     const head = lines[0].split("\t").map(norm);
     const col = (...names) => head.findIndex(h => names.some(n => h.startsWith(n)));
     const iNom = col("nombre"), iApe = col("apellido"), iMail = col("direccion de correo","correo","email");
-    const iCed = col("documento","cedula"), iCod = col("codigo banner","id banner","idbanner","codigo");
-    const iNota = col("total del curso","nota"), iApr = col("aprobo");
+    const iCed = col("documento","cedula","identificacion"), iCod = col("codigo banner","id banner","id_banner","idbanner","codigo");
+    const iNota = col("total del curso","notafinal","nota"), iApr = col("aprobo");
     if(iCed === -1) throw new Error("No encontré la columna de documento/cédula en el encabezado.");
     return lines.slice(1).map(l => {
       const c = l.split("\t");
       const g = i => i === -1 ? "" : (c[i] || "").trim();
       const nota = parseFloat(g(iNota).replace(",", "."));
-      const approved = iApr !== -1 ? /^s/i.test(g(iApr)) : (!isNaN(nota) && nota >= MIN_GRADE);
+      // la nota se redondea a un decimal: 3.46 a 3.49 cuentan como 3.5
+      const approved = iApr !== -1 ? /^s/i.test(g(iApr)) : (!isNaN(nota) && Math.round(nota * 10 + 1e-9) / 10 >= MIN_GRADE);
       return { cedula: g(iCed), code: g(iCod), name: [g(iNom), g(iApe)].filter(Boolean).join(" ").toUpperCase(), email: g(iMail), approved };
     }).filter(st => st.cedula);
   }
