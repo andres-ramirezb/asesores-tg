@@ -430,7 +430,7 @@
       <input type="file" id="mafiFileInput" accept=".csv" onchange="handleMafiFileUpload(event)" style="font-family:var(--font); font-size:0.85rem; margin-bottom:6px;">
       <div id="mafiFileStatus" class="hint" style="margin-bottom:14px;"></div>
 
-      <p class="hint">Escribe la cédula de cada integrante: si el archivo MAFI está cargado, el nombre, ID y correo se completan solos. Si no se encuentra ahí, puedes escribirlos manualmente.</p>
+      <p class="hint">Escribe la cédula de cada integrante: si está en la base de estudiantes o en el archivo MAFI cargado, el nombre, ID y correo se completan solos. Si no aparece en ninguno, escríbelos manualmente.</p>
       <div class="members-grid" id="manualMembersGrid"></div>
       <div class="actions" style="justify-content:flex-start; margin-top:14px;">
         <button class="primary" onclick="submitManualGroup()">Registrar grupo manual</button>
@@ -678,7 +678,7 @@ function buildManualMemberBox(idx){
       <input type="text" class="manual-ced-input" placeholder="Ej: 1000100001" oninput="onManualCedulaInput(this)">
     </div>
     <div>
-      <label>Nombre completo${idx===1 ? " *" : ""}</label>
+      <label>Nombre completo (se completa solo si está en la base)</label>
       <input type="text" class="manual-name-input" placeholder="Ej: Ana María Rojas Cárdenas">
     </div>
     <div>
@@ -796,6 +796,7 @@ function handleMafiFileUpload(event){
   reader.readAsText(file, "UTF-8");
 }
 
+let manualLookupTimers = new WeakMap();
 function onManualCedulaInput(input){
   const box = input.closest(".member-box");
   const cedula = input.value.trim();
@@ -803,25 +804,51 @@ function onManualCedulaInput(input){
   const nameInput = box.querySelector(".manual-name-input");
   const codeInput = box.querySelector(".manual-code-input");
   const emailInput = box.querySelector(".manual-email-input");
+  const fill = (rec) => {
+    if(!nameInput.value.trim()) nameInput.value = rec.name || "";
+    if(!codeInput.value.trim()) codeInput.value = rec.code || "";
+    if(!emailInput.value.trim()) emailInput.value = rec.email || "";
+  };
 
-  if(!window._mafiRecords || !cedula){
-    statusTag.style.display = "none";
-    return;
-  }
+  if(!cedula){ statusTag.style.display = "none"; return; }
 
-  const found = window._mafiRecords[cedula];
+  // 1) archivo MAFI cargado en el navegador
+  const found = window._mafiRecords ? window._mafiRecords[cedula] : null;
   if(found){
-    if(!nameInput.value.trim()) nameInput.value = found.name;
-    if(!codeInput.value.trim()) codeInput.value = found.code;
-    if(!emailInput.value.trim()) emailInput.value = found.email;
+    fill(found);
     statusTag.style.display = "block";
     statusTag.className = "status-tag ok";
     statusTag.textContent = "Encontrado en el archivo MAFI cargado.";
-  }else{
-    statusTag.style.display = "block";
-    statusTag.className = "status-tag pending";
-    statusTag.textContent = "No se encontró en el archivo MAFI. Completa los datos manualmente.";
+    return;
   }
+
+  // 2) base de estudiantes guardada en la Google Sheet
+  statusTag.style.display = "block";
+  statusTag.className = "status-tag pending";
+  statusTag.textContent = "Buscando en la base…";
+  clearTimeout(manualLookupTimers.get(box));
+  manualLookupTimers.set(box, setTimeout(async () => {
+    try{
+      const data = await apiGet({ action:"lookupStudent", value: cedula });
+      if(input.value.trim() !== cedula) return;
+      if(data.found){
+        fill(data.student);
+        if(data.groupCode){
+          statusTag.className = "status-tag bad";
+          statusTag.textContent = "Ya pertenece al grupo " + data.groupCode + ".";
+        }else{
+          statusTag.className = "status-tag ok";
+          statusTag.textContent = "Encontrado en la base" + (data.student.approved ? " (aprobó Fundamentos)." : " (no aprobó Fundamentos; se registrará como manual).");
+        }
+      }else{
+        statusTag.className = "status-tag pending";
+        statusTag.textContent = "No está en la base ni en el MAFI cargado. Escribe el nombre completo manualmente.";
+      }
+    }catch(e){
+      statusTag.className = "status-tag pending";
+      statusTag.textContent = "No se pudo consultar la base. Escribe el nombre manualmente.";
+    }
+  }, 400));
 }
 
 function initManualForm(){
