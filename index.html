@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Conformación de Grupos — Trabajo de Grado</title>
+<title>Conformación de Grupos IA55 - Trabajo de Grado</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -332,7 +332,7 @@
   <div id="view-public" class="view active">
     <header class="top">
       <h1>Conformación de Grupos de Trabajo de Grado</h1>
-      <p>Modalidad Proyecto Particular</p>
+      <p>Modalidad Proyecto Particular · Periodo 202655</p>
     </header>
 
     <div class="panel instructivo">
@@ -340,8 +340,8 @@
       <ol>
         <li>Este formulario sirve únicamente para <strong>conformar y registrar tu grupo de trabajo de grado</strong> en la modalidad Proyecto Particular. La asignación del docente asesor se resolverá en otro momento, fuera de este formulario.</li>
         <li>El grupo puede tener entre 1 y 3 integrantes. Basta con que <strong>un solo integrante</strong> diligencie el formulario por todos.</li>
-        <li>Para cada integrante, escribe su <strong>ID</strong> o su <strong>cédula</strong> — con uno de los dos basta. El nombre, el correo y el estado de aprobación se cargan automáticamente.</li>
-        <li>Solo pueden matricular esta modalidad quienes <strong>aprobaron el curso de Fundamentos y Enfoques de Investigación Social y Educativa</strong> en el periodo anterior. El sistema lo valida y lo muestra en verde o en rojo.</li>
+        <li>Para cada integrante, escribe su <strong>ID</strong> o su <strong>cédula</strong>; con uno de los dos basta. El nombre, el correo y el estado de aprobación se cargan automáticamente.</li>
+        <li>Solo pueden matricular esta modalidad quienes <strong>aprobaron el curso de Fundamentos y Enfoques de Investigación Social y Educativa</strong> en el periodo 202653. El sistema lo valida y lo muestra en verde o en rojo.</li>
         <li>Si alguien ya está registrado en otro grupo, el sistema lo indicará y no permitirá continuar.</li>
       </ol>
       <p class="aviso">Esto se profundizará en la <strong>sesión general de orientaciones del curso de Investigación Acción</strong> que se realizará esta semana, pero <strong>debes registrar tu grupo lo más pronto posible</strong>.</p>
@@ -393,7 +393,7 @@
     <div class="panel">
       <h3 class="section-title">Base de estudiantes habilitados</h3>
       <p class="hint">Formato: una línea por estudiante → <code>Cédula | ID | Nombre completo | Correo | Aprobó (SI/NO)</code>. Base actual: <strong id="studentDbCount">0</strong> estudiantes (<strong id="studentApprovedCount">0</strong> aprobados).</p>
-      <textarea id="studentTextarea" placeholder="1000123456 | EST-0231 | Juana Pérez Gómez | juana.perez@correo.edu.co | SI"></textarea>
+      <textarea id="studentTextarea" placeholder="1000123456 | 100256295 | JUANA PÉREZ GÓMEZ | jperez@estudiante.ibero.edu.co | SI"></textarea>
       <div style="margin-top:10px;">
         <button class="primary" onclick="saveStudents()">Guardar base de estudiantes</button>
       </div>
@@ -444,8 +444,8 @@
 
 
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxAujQ5aRD-CN1vUfDk_Lf5jDIy6oLHxVzZxQFJNsir_X9JjsyVDAxzjgiVhjPaZ5H_/exec";
-const ADMIN_KEY = "c24b6ce89062a936"; // debe coincidir con ADMIN_KEY en Code.gs
+const API_URL = "https://script.google.com/macros/s/AKfycbwMEefpHf9ek5jGuDEeAwqcxx5rg7ydAKN6XX6fFquNTCTMGwCC6m5pW8loWBFNCgErWQ/exec";
+const ADMIN_KEY = "7f7d731c8d3bf7ef"; // debe coincidir con ADMIN_KEY en Code.gs
 const MAX_GROUP_SIZE = 3;
 
 let adminKeyEntered = "";
@@ -484,7 +484,7 @@ function buildMemberBox(idx){
     <div class="member-label">Integrante ${idx}${idx>1 ? " (opcional)" : ""}</div>
     <div>
       <label>ID</label>
-      <input type="text" class="code-input" placeholder="Ej: EST-1001" oninput="onIdentifierInput(this)">
+      <input type="text" class="code-input" placeholder="Ej: 100256295" oninput="onIdentifierInput(this)">
     </div>
     <div>
       <label>Cédula</label>
@@ -563,9 +563,13 @@ function onIdentifierInput(input){
         if(input.classList.contains("code-input") && !cedInput.value.trim()) cedInput.value = data.student.cedula;
         if(input.classList.contains("ced-input") && !codeInput.value.trim()) codeInput.value = data.student.code;
 
-        if(data.student.approved){
+        if(data.groupCode){
+          statusTag.className = "status-tag bad";
+          statusTag.textContent = "Ya pertenece al grupo " + data.groupCode + ". No puede registrarse en otro grupo.";
+          box.dataset.valid = "";
+        }else if(data.student.approved){
           statusTag.className = "status-tag ok";
-          statusTag.textContent = "Aprobó Fundamentos y Enfoques de Investigación Social y Educativa — habilitado(a) para matricular.";
+          statusTag.textContent = "Aprobó Fundamentos y Enfoques de Investigación Social y Educativa en 202653 - habilitado(a) para matricular.";
           box.dataset.valid = "1";
           box.dataset.cedula = data.student.cedula;
           box.dataset.code = data.student.code;
@@ -573,7 +577,7 @@ function onIdentifierInput(input){
           box.dataset.email = data.student.email || "";
         }else{
           statusTag.className = "status-tag bad";
-          statusTag.textContent = "No aprobó Fundamentos y Enfoques de Investigación Social y Educativa — no puede matricular esta modalidad.";
+          statusTag.textContent = "No aprobó Fundamentos y Enfoques de Investigación Social y Educativa en 202653 - no puede matricular esta modalidad.";
           box.dataset.valid = "";
         }
       }else{
@@ -653,8 +657,10 @@ function tryLogin(){
 }
 
 async function loadAdminData(){
-  const data = await apiGet({ action:"adminData", key: adminKeyEntered });
-  if(data.error){ return; }
+  let data;
+  try{ data = await apiGet({ action:"adminData", key: adminKeyEntered }); }
+  catch(e){ document.getElementById("groupsTableWrap").innerHTML = `<div class="msg error">No se pudo conectar con el servidor. Revisa API_URL y que la implementación esté publicada para "Cualquier usuario".</div>`; return; }
+  if(data.error){ document.getElementById("groupsTableWrap").innerHTML = `<div class="msg error">${escapeHTML(data.error)}</div>`; return; }
   document.getElementById("studentDbCount").textContent = data.studentCount;
   document.getElementById("studentApprovedCount").textContent = data.approvedCount;
   document.getElementById("groupsCount").textContent = data.groups.length;
@@ -814,7 +820,7 @@ function onManualCedulaInput(input){
   }else{
     statusTag.style.display = "block";
     statusTag.className = "status-tag pending";
-    statusTag.textContent = "No se encontró en el archivo MAFI — completa los datos manualmente.";
+    statusTag.textContent = "No se encontró en el archivo MAFI. Completa los datos manualmente.";
   }
 }
 
@@ -848,7 +854,14 @@ async function submitManualGroup(){
     return;
   }
 
-  const result = await apiPost({ action:"adminRegisterGroup", key: adminKeyEntered, students });
+  msg.innerHTML = `<div class="msg">Registrando…</div>`;
+  let result;
+  try{
+    result = await apiPost({ action:"adminRegisterGroup", key: adminKeyEntered, students });
+  }catch(e){
+    msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor (${escapeHTML(e.message)}). El grupo NO quedó registrado.</div>`;
+    return;
+  }
   if(result.error){
     msg.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`;
     return;
@@ -960,7 +973,10 @@ async function saveStudents(){
     msg.innerHTML = `<div class="msg error">No se detectaron líneas válidas.</div>`;
     return;
   }
-  const result = await apiPost({ action:"adminSaveStudents", key: adminKeyEntered, students });
+  msg.innerHTML = `<div class="msg">Guardando ${students.length} estudiantes…</div>`;
+  let result;
+  try{ result = await apiPost({ action:"adminSaveStudents", key: adminKeyEntered, students }); }
+  catch(e){ msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor. La base NO se guardó.</div>`; return; }
   if(result.error){
     msg.innerHTML = `<div class="msg error">${escapeHTML(result.error)}</div>`;
     return;
@@ -971,13 +987,13 @@ async function saveStudents(){
 }
 
 async function deleteGroup(groupId){
-  if(!confirm("¿Eliminar este grupo? Esta acción no se puede deshacer.")) return;
+  if(!confirm("¿Eliminar este grupo? Quedará respaldado en la hoja Grupos_eliminados de la Google Sheet.")) return;
   await apiPost({ action:"adminDeleteGroup", key: adminKeyEntered, groupId });
   loadAdminData();
 }
 
 async function resetGroups(){
-  if(!confirm("¿Borrar TODOS los grupos registrados? Esta acción no se puede deshacer.")) return;
+  if(!confirm("¿Borrar TODOS los grupos registrados? Quedarán respaldados en la hoja Grupos_eliminados de la Google Sheet.")) return;
   await apiPost({ action:"adminResetGroups", key: adminKeyEntered });
   loadAdminData();
 }
@@ -999,7 +1015,7 @@ function exportCSV(){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "grupos_trabajo_grado.csv";
+  a.download = "grupos_IA55_trabajo_grado.csv";
   a.click();
   URL.revokeObjectURL(url);
 }
