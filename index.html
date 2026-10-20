@@ -171,6 +171,12 @@
   .status-tag.ok{ background:var(--success-soft); color:var(--success); }
   .status-tag.bad{ background:var(--danger-soft); color:var(--danger); }
   .status-tag.pending{ background:#f0eee9; color:var(--ink-soft); }
+  .status-tag.warn{ background:var(--warn-soft); color:var(--warn); }
+  .mafi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:2px 10px; margin-top:4px; }
+  .badge{ display:inline-block; font-size:0.68rem; font-weight:700; padding:2px 6px; border-radius:5px; background:var(--warn-soft); color:var(--warn); margin-left:4px; }
+  .route-chips{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .route-chip{ font-size:0.78rem; padding:5px 8px; border:1px solid var(--line); border-radius:7px; background:#fff; }
+  .route-chip input{ margin-right:5px; }
 
   .actions{
     margin-top:20px;
@@ -324,6 +330,7 @@
     text-decoration:underline;
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -392,7 +399,7 @@
 
     <div class="panel">
       <h3 class="section-title">Base de estudiantes habilitados</h3>
-      <p class="hint">Formato: una línea por estudiante → <code>Cédula | ID | Nombre completo | Correo | Aprobó (SI/NO)</code>. Base actual: <strong id="studentDbCount">0</strong> estudiantes (<strong id="studentApprovedCount">0</strong> aprobados).</p>
+      <p class="hint">Pega la tabla copiada directamente del Excel de Fundamentos (con encabezados; aprueba quien tenga nota ≥ 3.5), o una línea por estudiante en formato <code>Cédula | ID | Nombre completo | Correo | Aprobó (SI/NO)</code>. Base actual: <strong id="studentDbCount">0</strong> estudiantes (<strong id="studentApprovedCount">0</strong> aprobados).</p>
       <textarea id="studentTextarea" placeholder="1000123456 | 100256295 | JUANA PÉREZ GÓMEZ | jperez@estudiante.ibero.edu.co | SI"></textarea>
       <div style="margin-top:10px;">
         <button class="primary" onclick="saveStudents()">Guardar base de estudiantes</button>
@@ -401,10 +408,29 @@
     </div>
 
     <div class="panel">
+      <h3 class="section-title">Archivo MAFI 202655</h3>
+      <p class="hint">Carga el corte MAFI más reciente (CSV). De ahí salen el tipo de estudiante, la ruta, el operador y el sello que se muestran en el formulario, en la tabla de grupos y en el Excel. Al cargar un corte nuevo se reemplaza el anterior y se actualizan los datos de todos los grupos ya registrados.</p>
+      <p class="hint">Corte actual: <strong id="mafiStatus">sin cargar</strong></p>
+      <input type="file" id="mafiFileInput" accept=".csv" onchange="handleMafiFileUpload(event)" style="font-family:var(--font); font-size:0.85rem;">
+      <div id="mafiMsg"></div>
+    </div>
+
+    <div class="panel">
+      <h3 class="section-title">Rutas habilitadas por excepción</h3>
+      <p class="hint">Los estudiantes con estas rutas en el MAFI pueden registrarse desde "Registrar excepción" aunque no estén en la base de Fundamentos. El formulario público no cambia: allí solo entran los aprobados de Fundamentos 202653.</p>
+      <div class="route-chips" id="routeChips"></div>
+      <label style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Agregar otra ruta (código, ej: RTP7)</label>
+      <input type="text" id="extraRouteInput" placeholder="RTP7" style="width:140px; padding:8px 10px; border:1px solid var(--line); border-radius:7px; font-family:var(--font);">
+      <button class="secondary" onclick="addExtraRoute()">Agregar</button>
+      <div style="margin-top:10px;"><button class="primary" onclick="saveRoutes()">Guardar rutas</button></div>
+      <div id="routesMsg"></div>
+    </div>
+
+    <div class="panel">
       <div class="top-actions">
         <h3 class="section-title" style="margin:0;">Grupos registrados (<span id="groupsCount">0</span>)</h3>
         <div>
-          <button class="secondary" onclick="exportCSV()">Exportar CSV</button>
+          <button class="secondary" onclick="exportCSV()">Exportar Excel</button>
           <button class="danger-btn" onclick="resetGroups()">Borrar todos los grupos</button>
         </div>
       </div>
@@ -423,17 +449,11 @@
     </div>
 
     <div class="panel">
-      <h3 class="section-title">Registrar grupo manualmente (anula validación de Fundamentos)</h3>
-      <p class="hint">Úsalo solo para casos especiales. No se valida contra la base de aprobados de Fundamentos, pero sí se revisa que nadie quede duplicado en otro grupo. Cada registro queda marcado como "Manual" en la tabla.</p>
-
-      <label style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">Cargar archivo MAFI (CSV) para extraer los datos automáticamente</label>
-      <input type="file" id="mafiFileInput" accept=".csv" onchange="handleMafiFileUpload(event)" style="font-family:var(--font); font-size:0.85rem; margin-bottom:6px;">
-      <div id="mafiFileStatus" class="hint" style="margin-bottom:14px;"></div>
-
-      <p class="hint">Escribe la cédula de cada integrante: si está en la base de estudiantes o en el archivo MAFI cargado, el nombre, ID y correo se completan solos. Si no aparece en ninguno, escríbelos manualmente.</p>
+      <h3 class="section-title">Registrar excepción</h3>
+      <p class="hint">Escribe el ID o la cédula de cada integrante. Se busca en la base de Fundamentos y en el MAFI cargado, y se indica si queda habilitado por Fundamentos, por ruta de excepción o si no cumple. Para casos que no cumplen, marca "Forzar registro". Cada registro queda marcado en la tabla con su motivo.</p>
       <div class="members-grid" id="manualMembersGrid"></div>
       <div class="actions" style="justify-content:flex-start; margin-top:14px;">
-        <button class="primary" onclick="submitManualGroup()">Registrar grupo manual</button>
+        <button class="primary" id="manualSubmitBtn" onclick="submitManualGroup()">Registrar grupo de excepción</button>
         <button class="secondary" onclick="initManualForm()">Limpiar</button>
       </div>
       <div id="manualGroupMsg"></div>
@@ -475,6 +495,24 @@ function escapeHTML(str){
   return String(str||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
 
+const ROUTE_LABELS = {
+  RTP3:"P2 MAESTRIA 15 (RUTA 3) INCLUSION", RTI2:"P2 MAESTRIA 15 (RUTA 3) INTERCUL",
+  RTP4:"P2 MAESTRIA 15 (RUTA 4) INCLUSION", RTI3:"P2 MAESTRIA 15 (RUTA 4) INTERCUL",
+  RTP5:"P2 MAESTRIA 12 (RUTA 5) INCLUSION", RTI4:"P2 MAESTRIA 12 (RUTA 5) INTERCUL",
+  RTP6:"P2 MAESTRIA 15 (RUTA 6) INCLUSION"
+};
+function routeText_(r){ if(!r) return "Sin ruta"; return ROUTE_LABELS[r] ? r + " - " + ROUTE_LABELS[r] : r; }
+function renderMafiFields_(el, mafi){
+  if(!el) return;
+  if(!mafi){
+    el.innerHTML = `<div class="readonly-field" style="grid-column:1/-1;"><div class="rf-label">MAFI 202655</div><div class="rf-value" style="font-weight:400;">No aparece en el MAFI cargado</div></div>`;
+  }else{
+    const f = (l,v) => `<div class="readonly-field"><div class="rf-label">${l}</div><div class="rf-value">${escapeHTML(v||"-")}</div></div>`;
+    el.innerHTML = f("Tipo de estudiante", mafi.tipo) + f("Ruta", routeText_(mafi.ruta)) + f("Operador", mafi.operador) + f("Sello", mafi.sello);
+  }
+  el.style.display = "grid";
+}
+
 /* ===================== FORMULARIO PÚBLICO ===================== */
 function buildMemberBox(idx){
   const box = document.createElement("div");
@@ -498,6 +536,7 @@ function buildMemberBox(idx){
       <div class="rf-label">Correo</div>
       <div class="rf-value" data-email></div>
     </div>
+    <div class="mafi-grid" data-mafi-field style="display:none;"></div>
     <div class="status-tag" data-status style="display:none;"></div>
   `;
   return box;
@@ -528,6 +567,7 @@ function onIdentifierInput(input){
   const emailField = box.querySelector("[data-email-field]");
   const statusTag = box.querySelector("[data-status]");
 
+  box.querySelector("[data-mafi-field]").style.display = "none";
   if(!value){
     nameField.style.display = "none";
     emailField.style.display = "none";
@@ -560,6 +600,7 @@ function onIdentifierInput(input){
         box.querySelector("[data-email]").textContent = data.student.email || "—";
         nameField.style.display = "block";
         emailField.style.display = "block";
+        renderMafiFields_(box.querySelector("[data-mafi-field]"), data.mafi);
         if(input.classList.contains("code-input") && !cedInput.value.trim()) cedInput.value = data.student.cedula;
         if(input.classList.contains("ced-input") && !codeInput.value.trim()) codeInput.value = data.student.code;
 
@@ -597,7 +638,7 @@ function onIdentifierInput(input){
 }
 
 function updateSubmitState(){
-  const boxes = Array.from(document.querySelectorAll(".member-box"));
+  const boxes = Array.from(document.querySelectorAll("#membersGrid .member-box"));
   const box1 = boxes.find(b => b.dataset.idx === "1");
   const anyInvalidFilled = boxes.some(b => {
     const filled = b.querySelector(".code-input").value.trim() || b.querySelector(".ced-input").value.trim();
@@ -610,7 +651,7 @@ function updateSubmitState(){
 async function submitGroup(){
   const msgEl = document.getElementById("formMsg");
   msgEl.innerHTML = "";
-  const boxes = Array.from(document.querySelectorAll(".member-box"));
+  const boxes = Array.from(document.querySelectorAll("#membersGrid .member-box"));
   const students = boxes
     .filter(b => b.dataset.valid === "1")
     .map(b => ({ cedula: b.dataset.cedula, code: b.dataset.code }));
@@ -664,6 +705,8 @@ async function loadAdminData(){
   document.getElementById("studentDbCount").textContent = data.studentCount;
   document.getElementById("studentApprovedCount").textContent = data.approvedCount;
   document.getElementById("groupsCount").textContent = data.groups.length;
+  document.getElementById("mafiStatus").textContent = data.mafiCount ? `${data.mafiCount} registros${data.mafiFile ? " - " + data.mafiFile : ""}${data.mafiLoadedAt ? " (cargado " + data.mafiLoadedAt + ")" : ""}` : "sin cargar";
+  renderRouteChips_(data.exceptionRoutes);
   renderGroupsTable(data.groups);
   window._lastGroups = data.groups;
 }
@@ -674,179 +717,90 @@ function buildManualMemberBox(idx){
   box.innerHTML = `
     <div class="member-label">Integrante ${idx}${idx>1 ? " (opcional)" : ""}</div>
     <div>
-      <label>Cédula${idx===1 ? " *" : ""}</label>
-      <input type="text" class="manual-ced-input" placeholder="Ej: 1000100001" oninput="onManualCedulaInput(this)">
+      <label>ID o cédula</label>
+      <input type="text" class="manual-key-input" placeholder="Ej: 100256295" oninput="onManualKeyInput(this)">
     </div>
-    <div>
-      <label>Nombre completo (se completa solo si está en la base)</label>
-      <input type="text" class="manual-name-input" placeholder="Ej: Ana María Rojas Cárdenas">
+    <div class="manual-fields" style="display:none;">
+      <div>
+        <label>Nombre completo</label>
+        <input type="text" class="manual-name-input">
+      </div>
+      <div>
+        <label>Cédula</label>
+        <input type="text" class="manual-ced-input">
+      </div>
+      <div>
+        <label>ID</label>
+        <input type="text" class="manual-code-input">
+      </div>
+      <div>
+        <label>Correo</label>
+        <input type="text" class="manual-email-input">
+      </div>
     </div>
-    <div>
-      <label>ID (opcional)</label>
-      <input type="text" class="manual-code-input" placeholder="Ej: 100249535">
-    </div>
-    <div>
-      <label>Correo (opcional)</label>
-      <input type="text" class="manual-email-input" placeholder="Ej: correo@estudiante.ibero.edu.co">
-    </div>
+    <div class="mafi-grid" data-mafi-field style="display:none;"></div>
     <div class="status-tag" data-mafi-status style="display:none;"></div>
+    <label class="force-wrap" style="display:none; font-size:0.78rem; margin-top:6px;"><input type="checkbox" class="manual-force"> Forzar registro aunque no cumpla</label>
   `;
   return box;
 }
 
-/* ===================== CARGA DE ARCHIVO MAFI (CSV) ===================== */
-window._mafiRecords = null; // Map: cedula -> {cedula, code, name, email}
-
-function parseCSVLine_(line){
-  // Parser CSV simple que respeta comillas dobles
-  const result = [];
-  let cur = "";
-  let inQuotes = false;
-  for(let i=0;i<line.length;i++){
-    const c = line[i];
-    if(inQuotes){
-      if(c === '"'){
-        if(line[i+1] === '"'){ cur += '"'; i++; }
-        else { inQuotes = false; }
-      } else { cur += c; }
-    } else {
-      if(c === '"'){ inQuotes = true; }
-      else if(c === ','){ result.push(cur); cur = ""; }
-      else { cur += c; }
-    }
-  }
-  result.push(cur);
-  return result;
-}
-
-function findColumn_(headers, candidates){
-  const lower = headers.map(h => h.trim().toUpperCase());
-  for(const cand of candidates){
-    const idx = lower.indexOf(cand.toUpperCase());
-    if(idx !== -1) return idx;
-  }
-  return -1;
-}
-
-function handleMafiFileUpload(event){
-  const file = event.target.files[0];
-  const statusEl = document.getElementById("mafiFileStatus");
-  if(!file){ return; }
-  statusEl.textContent = "Leyendo archivo...";
-
-  const reader = new FileReader();
-  reader.onload = function(e){
-    try{
-      const text = e.target.result;
-      const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim().length > 0);
-      if(lines.length < 2){
-        statusEl.textContent = "El archivo no tiene datos legibles.";
-        return;
-      }
-      const headers = parseCSVLine_(lines[0]);
-      const idxCedula = findColumn_(headers, ["IDENTIFICACION", "CEDULA"]);
-      const idxIdBanner = findColumn_(headers, ["IDBANNER", "ID_BANNER"]);
-      const idxUsuario = findColumn_(headers, ["USUARIO"]);
-      const idxNombreCompleto = findColumn_(headers, ["NOMBRE", "NOMBRE_COMPLETO", "ESTUDIANTE"]);
-      const idxPrimerApellido = findColumn_(headers, ["PRIMER_APELLIDO"]);
-      const idxSegundoApellido = findColumn_(headers, ["SEGUNDO_APELLIDO"]);
-      const idxPrimerNombre = findColumn_(headers, ["PRIMER_NOMBRE"]);
-      const idxSegundoNombre = findColumn_(headers, ["SEGUNDO_NOMBRE"]);
-      const idxEmailInst = findColumn_(headers, ["EMAIL_INSTITUCIONAL", "CORREO_INSTITUCIONAL"]);
-      const idxEmailPers = findColumn_(headers, ["EMAIL_PERSONAL", "CORREO_PERSONAL", "CORREO"]);
-
-      if(idxCedula === -1){
-        statusEl.innerHTML = `<span style="color:var(--danger);">No se encontró una columna de cédula/identificación en el archivo.</span>`;
-        return;
-      }
-
-      const records = {};
-      for(let i=1;i<lines.length;i++){
-        const cols = parseCSVLine_(lines[i]);
-        const cedula = (cols[idxCedula] || "").trim();
-        if(!cedula) continue;
-
-        let name = "";
-        if(idxNombreCompleto !== -1) name = (cols[idxNombreCompleto] || "").trim();
-        if(!name){
-          const parts = [idxPrimerApellido, idxSegundoApellido, idxPrimerNombre, idxSegundoNombre]
-            .map(ix => ix !== -1 ? (cols[ix] || "").trim() : "")
-            .filter(Boolean);
-          name = parts.join(" ");
-        }
-
-        const code = idxIdBanner !== -1 ? (cols[idxIdBanner] || "").trim() : (idxUsuario !== -1 ? (cols[idxUsuario] || "").trim() : "");
-        const email = (idxEmailInst !== -1 && (cols[idxEmailInst] || "").trim())
-          ? (cols[idxEmailInst] || "").trim()
-          : (idxEmailPers !== -1 ? (cols[idxEmailPers] || "").trim() : "");
-
-        records[cedula] = { cedula, code, name, email };
-      }
-
-      window._mafiRecords = records;
-      statusEl.innerHTML = `<span style="color:var(--success);">Archivo cargado: ${Object.keys(records).length} registros. Escribe una cédula abajo para autocompletar.</span>`;
-
-      document.querySelectorAll(".manual-ced-input").forEach(input => {
-        if(input.value.trim()) onManualCedulaInput(input);
-      });
-    }catch(err){
-      statusEl.innerHTML = `<span style="color:var(--danger);">No se pudo leer el archivo. Verifica que sea un CSV.</span>`;
-    }
-  };
-  reader.readAsText(file, "UTF-8");
-}
-
 let manualLookupTimers = new WeakMap();
-function onManualCedulaInput(input){
+function onManualKeyInput(input){
   const box = input.closest(".member-box");
-  const cedula = input.value.trim();
+  const value = input.value.trim();
   const statusTag = box.querySelector("[data-mafi-status]");
-  const nameInput = box.querySelector(".manual-name-input");
-  const codeInput = box.querySelector(".manual-code-input");
-  const emailInput = box.querySelector(".manual-email-input");
-  const fill = (rec) => {
-    if(!nameInput.value.trim()) nameInput.value = rec.name || "";
-    if(!codeInput.value.trim()) codeInput.value = rec.code || "";
-    if(!emailInput.value.trim()) emailInput.value = rec.email || "";
-  };
-
-  if(!cedula){ statusTag.style.display = "none"; return; }
-
-  // 1) archivo MAFI cargado en el navegador
-  const found = window._mafiRecords ? window._mafiRecords[cedula] : null;
-  if(found){
-    fill(found);
-    statusTag.style.display = "block";
-    statusTag.className = "status-tag ok";
-    statusTag.textContent = "Encontrado en el archivo MAFI cargado.";
-    return;
-  }
-
-  // 2) base de estudiantes guardada en la Google Sheet
+  const fields = box.querySelector(".manual-fields");
+  const mafiEl = box.querySelector("[data-mafi-field]");
+  const forceWrap = box.querySelector(".force-wrap");
+  box.dataset.state = "";
+  ["name","ced","code","email"].forEach(k => box.querySelector(".manual-"+k+"-input").value = "");
+  box.querySelector(".manual-force").checked = false;
+  mafiEl.style.display = "none"; forceWrap.style.display = "none"; fields.style.display = "none";
+  if(!value){ statusTag.style.display = "none"; return; }
   statusTag.style.display = "block";
   statusTag.className = "status-tag pending";
-  statusTag.textContent = "Buscando en la base…";
+  statusTag.textContent = "Buscando…";
   clearTimeout(manualLookupTimers.get(box));
   manualLookupTimers.set(box, setTimeout(async () => {
-    try{
-      const data = await apiGet({ action:"lookupStudent", value: cedula });
-      if(input.value.trim() !== cedula) return;
-      if(data.found){
-        fill(data.student);
-        if(data.groupCode){
-          statusTag.className = "status-tag bad";
-          statusTag.textContent = "Ya pertenece al grupo " + data.groupCode + ".";
-        }else{
-          statusTag.className = "status-tag ok";
-          statusTag.textContent = "Encontrado en la base" + (data.student.approved ? " (aprobó Fundamentos)." : " (no aprobó Fundamentos; se registrará como manual).");
-        }
-      }else{
-        statusTag.className = "status-tag pending";
-        statusTag.textContent = "No está en la base ni en el MAFI cargado. Escribe el nombre completo manualmente.";
-      }
-    }catch(e){
-      statusTag.className = "status-tag pending";
-      statusTag.textContent = "No se pudo consultar la base. Escribe el nombre manualmente.";
+    let data;
+    try{ data = await apiGet({ action:"adminLookup", key: adminKeyEntered, value }); }
+    catch(e){ statusTag.className = "status-tag bad"; statusTag.textContent = "No se pudo consultar el servidor."; return; }
+    if(input.value.trim() !== value) return;
+    if(data.error){ statusTag.className = "status-tag bad"; statusTag.textContent = data.error; return; }
+    fields.style.display = "block";
+    if(!data.found){
+      box.querySelector(".manual-ced-input").value = /^\d+$/.test(value) && value.length !== 9 ? value : "";
+      box.querySelector(".manual-code-input").value = /^\d{9}$/.test(value) ? value : "";
+      statusTag.className = "status-tag bad";
+      statusTag.textContent = "No está en la base de Fundamentos ni en el MAFI. Completa los datos y marca 'Forzar registro' si corresponde.";
+      forceWrap.style.display = "block";
+      box.dataset.state = "force";
+      return;
+    }
+    const st = data.student;
+    box.querySelector(".manual-name-input").value = st.name || "";
+    box.querySelector(".manual-ced-input").value = st.cedula || "";
+    box.querySelector(".manual-code-input").value = st.code || "";
+    box.querySelector(".manual-email-input").value = st.email || "";
+    renderMafiFields_(mafiEl, data.mafi);
+    if(data.groupCode){
+      statusTag.className = "status-tag bad";
+      statusTag.textContent = "Ya pertenece al grupo " + data.groupCode + ".";
+      box.dataset.state = "blocked";
+    }else if(data.approved){
+      statusTag.className = "status-tag ok";
+      statusTag.textContent = "Habilitado: aprobó Fundamentos 202653.";
+      box.dataset.state = "ok";
+    }else if(data.exceptionRoute){
+      statusTag.className = "status-tag ok";
+      statusTag.textContent = "Habilitado por excepción de ruta " + routeText_(data.mafi.ruta) + ".";
+      box.dataset.state = "ok";
+    }else{
+      statusTag.className = "status-tag warn";
+      statusTag.textContent = (data.inBase ? "No aprobó Fundamentos 202653" : "No está en la base de Fundamentos") + " y su ruta (" + routeText_(data.mafi && data.mafi.ruta) + ") no es de excepción.";
+      forceWrap.style.display = "block";
+      box.dataset.state = "force";
     }
   }, 400));
 }
@@ -863,40 +817,114 @@ function initManualForm(){
 async function submitManualGroup(){
   const msg = document.getElementById("manualGroupMsg");
   msg.innerHTML = "";
-
-  const boxes = Array.from(document.querySelectorAll("#manualMembersGrid .member-box"));
+  const boxes = Array.from(document.querySelectorAll("#manualMembersGrid .member-box"))
+    .filter(b => b.querySelector(".manual-key-input").value.trim());
+  if(!boxes.length){ msg.innerHTML = `<div class="msg error">Escribe al menos el ID o la cédula del Integrante 1.</div>`; return; }
+  if(boxes.some(b => !b.dataset.state)){ msg.innerHTML = `<div class="msg error">Espera a que termine la búsqueda de todos los integrantes.</div>`; return; }
+  if(boxes.some(b => b.dataset.state === "blocked")){ msg.innerHTML = `<div class="msg error">Hay integrantes que ya pertenecen a otro grupo.</div>`; return; }
+  if(boxes.some(b => b.dataset.state === "force" && !b.querySelector(".manual-force").checked)){
+    msg.innerHTML = `<div class="msg error">Hay integrantes que no cumplen. Marca "Forzar registro" en cada uno si quieres registrarlos igual.</div>`; return;
+  }
   const students = boxes.map(b => ({
     cedula: b.querySelector(".manual-ced-input").value.trim(),
-    name: b.querySelector(".manual-name-input").value.trim(),
     code: b.querySelector(".manual-code-input").value.trim(),
-    email: b.querySelector(".manual-email-input").value.trim()
-  })).filter(s => s.cedula || s.name);
+    name: b.querySelector(".manual-name-input").value.trim(),
+    email: b.querySelector(".manual-email-input").value.trim(),
+    force: b.querySelector(".manual-force").checked
+  }));
+  if(students.some(x => !x.cedula || !x.name)){ msg.innerHTML = `<div class="msg error">Cada integrante necesita cédula y nombre.</div>`; return; }
 
-  if(students.length < 1){
-    msg.innerHTML = `<div class="msg error">Completa al menos cédula y nombre del Integrante 1.</div>`;
-    return;
-  }
-  if(students.some(s => !s.cedula || !s.name)){
-    msg.innerHTML = `<div class="msg error">Cada integrante que diligencies necesita cédula y nombre completos.</div>`;
-    return;
-  }
-
+  const btn = document.getElementById("manualSubmitBtn");
+  btn.disabled = true;
   msg.innerHTML = `<div class="msg">Registrando…</div>`;
   let result;
-  try{
-    result = await apiPost({ action:"adminRegisterGroup", key: adminKeyEntered, students });
-  }catch(e){
-    msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor (${escapeHTML(e.message)}). El grupo NO quedó registrado.</div>`;
-    return;
-  }
-  if(result.error){
-    msg.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`;
-    return;
-  }
-
-  msg.innerHTML = `<div class="msg success">Grupo manual registrado con código ${escapeHTML(result.groupCode)}.</div>`;
+  try{ result = await apiPost({ action:"adminRegisterGroup", key: adminKeyEntered, students }); }
+  catch(e){ msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor. El grupo NO quedó registrado.</div>`; btn.disabled = false; return; }
+  btn.disabled = false;
+  if(result.error){ msg.innerHTML = `<div class="msg error">${escapeHTML(result.error).replace(/\n/g,"<br>")}</div>`; return; }
   initManualForm();
+  msg.innerHTML = `<div class="msg success">Grupo de excepción registrado con código ${escapeHTML(result.groupCode)}.</div>`;
   loadAdminData();
+}
+
+/* ===================== MAFI 202655 ===================== */
+function parseCSV_(text){
+  const rows = []; let row = [], cur = "", q = false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(q){
+      if(c === '"'){ if(text[i+1] === '"'){ cur += '"'; i++; } else q = false; }
+      else cur += c;
+    }else if(c === '"') q = true;
+    else if(c === ','){ row.push(cur); cur = ""; }
+    else if(c === '\n' || c === '\r'){
+      if(c === '\r' && text[i+1] === '\n') i++;
+      row.push(cur); cur = ""; if(row.some(v => v !== "")) rows.push(row); row = [];
+    }else cur += c;
+  }
+  row.push(cur); if(row.some(v => v !== "")) rows.push(row);
+  return rows;
+}
+
+function handleMafiFileUpload(event){
+  const file = event.target.files[0];
+  const msg = document.getElementById("mafiMsg");
+  if(!file) return;
+  msg.innerHTML = `<div class="msg">Leyendo archivo…</div>`;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    let rows;
+    try{
+      const all = parseCSV_(String(e.target.result).replace(/^﻿/, ""));
+      const head = all[0].map(h => h.trim().toUpperCase());
+      const ix = n => head.indexOf(n);
+      const need = ["IDENTIFICACION","IDBANNER","TIPOESTUDIANTE","COD_RUTA","OPERADOR","SELLO"];
+      const missing = need.filter(n => ix(n) === -1);
+      if(missing.length){ msg.innerHTML = `<div class="msg error">Al archivo le faltan columnas: ${missing.join(", ")}.</div>`; return; }
+      const g = (r,n) => ix(n) === -1 ? "" : (r[ix(n)] || "").trim();
+      rows = all.slice(1).map(r => ({
+        cedula: g(r,"IDENTIFICACION"), code: g(r,"IDBANNER"),
+        name: [g(r,"PRIMER_NOMBRE"), g(r,"SEGUNDO_NOMBRE"), g(r,"PRIMER_APELLIDO"), g(r,"SEGUNDO_APELLIDO")].filter(Boolean).join(" "),
+        email: g(r,"EMAIL_INSTITUCIONAL") || g(r,"EMAIL_PERSONAL"),
+        tipo: g(r,"TIPOESTUDIANTE"), ruta: g(r,"COD_RUTA"), operador: g(r,"OPERADOR"), sello: g(r,"SELLO")
+      })).filter(r => r.cedula || r.code);
+    }catch(err){ msg.innerHTML = `<div class="msg error">No se pudo leer el archivo. Verifica que sea el CSV del MAFI.</div>`; return; }
+    msg.innerHTML = `<div class="msg">Enviando ${rows.length} registros al servidor…</div>`;
+    let result;
+    try{ result = await apiPost({ action:"adminLoadMafi", key: adminKeyEntered, rows, fileName: file.name }); }
+    catch(err){ msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor. El MAFI NO se cargó.</div>`; return; }
+    if(result.error){ msg.innerHTML = `<div class="msg error">${escapeHTML(result.error)}</div>`; return; }
+    msg.innerHTML = `<div class="msg success">MAFI cargado: ${result.total} registros. Datos actualizados en ${result.groupsRefreshed} integrante(s) ya registrados.</div>`;
+    event.target.value = "";
+    loadAdminData();
+  };
+  reader.readAsText(file, "UTF-8");
+}
+
+/* ===================== RUTAS DE EXCEPCIÓN ===================== */
+function renderRouteChips_(active){
+  const set = new Set(active || []);
+  const codes = Array.from(new Set(Object.keys(ROUTE_LABELS).concat(active || [])));
+  document.getElementById("routeChips").innerHTML = codes.map(c =>
+    `<label class="route-chip"><input type="checkbox" value="${escapeHTML(c)}" ${set.has(c) ? "checked" : ""}>${escapeHTML(routeText_(c))}</label>`).join("");
+}
+function addExtraRoute(){
+  const input = document.getElementById("extraRouteInput");
+  const code = input.value.trim().toUpperCase();
+  if(!code) return;
+  const current = Array.from(document.querySelectorAll("#routeChips input:checked")).map(i => i.value);
+  if(!current.includes(code)) current.push(code);
+  renderRouteChips_(current);
+  input.value = "";
+}
+async function saveRoutes(){
+  const msg = document.getElementById("routesMsg");
+  const routes = Array.from(document.querySelectorAll("#routeChips input:checked")).map(i => i.value);
+  let result;
+  try{ result = await apiPost({ action:"adminSetRoutes", key: adminKeyEntered, routes }); }
+  catch(e){ msg.innerHTML = `<div class="msg error">No se pudo conectar con el servidor.</div>`; return; }
+  if(result.error){ msg.innerHTML = `<div class="msg error">${escapeHTML(result.error)}</div>`; return; }
+  msg.innerHTML = `<div class="msg success">Rutas guardadas: ${escapeHTML(result.routes.join(", ") || "ninguna")}.</div>`;
 }
 
 function renderGroupsTable(groups){
@@ -906,15 +934,20 @@ function renderGroupsTable(groups){
     return;
   }
   let rows = "";
-  groups.slice().sort((a,b) => (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}))
-  .forEach(g => {
+  sortGroups_(groups).forEach(g => {
     g.students.forEach((s, idx) => {
+      const m = s.mafi || {};
+      const motivo = s.motivo && s.motivo !== "FUNDAMENTOS" ? `<span class="badge">${escapeHTML(s.motivo)}</span>` : "";
       rows += `<tr>
         <td>${idx===0 ? `<input type="checkbox" class="group-checkbox" value="${escapeHTML(g.id)}" onchange="updateSelectedCount()">` : ""}</td>
-        <td>${idx===0 ? escapeHTML(g.groupCode||"—") + (g.manual ? ` <span style="color:var(--warn); font-size:0.72rem; font-weight:700;">MANUAL</span>` : "") : ""}</td>
-        <td>${escapeHTML(s.name)}</td>
+        <td>${idx===0 ? escapeHTML(g.groupCode||"-") : ""}</td>
+        <td>${escapeHTML(s.name)}${motivo}</td>
         <td>${escapeHTML(s.code)}</td>
         <td>${escapeHTML(s.cedula)}</td>
+        <td>${escapeHTML(m.tipo || "-")}</td>
+        <td>${escapeHTML(m.ruta || "-")}</td>
+        <td>${escapeHTML(m.operador || "-")}</td>
+        <td>${escapeHTML(m.sello || "-")}</td>
         <td>${escapeHTML(s.email)}</td>
         <td>${idx===0 ? new Date(g.timestamp).toLocaleString("es-CO") : ""}</td>
         <td>${idx===0 ? (g.asesor ? escapeHTML(g.asesor) : "<em style='color:var(--ink-soft);'>Sin asignar</em>") : ""}</td>
@@ -923,11 +956,53 @@ function renderGroupsTable(groups){
     });
   });
   wrap.innerHTML = `
-    <table>
-      <thead><tr><th></th><th>Código</th><th>Nombre</th><th>ID</th><th>Cédula</th><th>Correo</th><th>Fecha</th><th>Asesor asignado</th><th></th></tr></thead>
+    <div style="overflow-x:auto;"><table>
+      <thead><tr><th></th><th>Código</th><th>Nombre</th><th>ID</th><th>Cédula</th><th>Tipo de estudiante</th><th>Ruta</th><th>Operador</th><th>Sello</th><th>Correo</th><th>Fecha</th><th>Asesor asignado</th><th></th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>`;
+    </table></div>`;
   updateSelectedCount();
+}
+
+function sortGroups_(groups){
+  return groups.slice().sort((a,b) => (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true}));
+}
+
+// Filas para Excel: una por integrante, con datos del MAFI 202655
+function excelRows_(groups, asesorOverride){
+  const out = [];
+  sortGroups_(groups).forEach(g => {
+    g.students.forEach(s => {
+      const m = s.mafi || {};
+      out.push({
+        "Código grupo": g.groupCode || "",
+        "Asesor asignado": asesorOverride || g.asesor || "",
+        "Nombre estudiante": s.name, "ID": s.code, "Cédula": s.cedula, "Correo": s.email,
+        "Tipo de estudiante": s.mafi ? (m.tipo || "") : "NO ESTÁ EN MAFI",
+        "Código ruta": m.ruta || "", "Ruta": m.ruta ? routeText_(m.ruta) : "",
+        "Operador": m.operador || "", "Sello": m.sello || "",
+        "Motivo de registro": s.motivo || "FUNDAMENTOS",
+        "Fecha registro": new Date(g.timestamp).toLocaleString("es-CO")
+      });
+    });
+  });
+  return out;
+}
+
+function downloadExcel_(rows, fileName, sheetName){
+  if(typeof XLSX === "undefined"){
+    // respaldo: CSV si no cargó la librería de Excel
+    const head = Object.keys(rows[0] || {"Sin datos":""});
+    const lines = [head.map(csvSafe).join(",")].concat(rows.map(r => head.map(h => csvSafe(r[h])).join(",")));
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fileName.replace(/\.xlsx$/, ".csv"); a.click();
+    return;
+  }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const head = Object.keys(rows[0] || {});
+  ws["!cols"] = head.map(h => ({ wch: Math.min(45, Math.max(h.length, ...rows.map(r => String(r[h]||"").length)) + 2) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName || "Grupos");
+  XLSX.writeFile(wb, fileName);
 }
 
 function updateSelectedCount(){
@@ -968,32 +1043,42 @@ async function assignAdvisorAndExport(){
 function exportInscripcionCSV(groupIds, asesor){
   const idsSet = new Set(groupIds);
   const groups = (window._lastGroups || []).filter(g => idsSet.has(g.id));
-  const header = ["Código grupo","Asesor asignado","Nombre estudiante","ID","Cédula","Correo","Fecha registro"];
-  const lines = [header.join(",")];
-  groups.slice().sort((a,b) => (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(g => {
-    g.students.forEach(s => {
-      lines.push([csvSafe(g.groupCode||""), csvSafe(asesor), csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula), csvSafe(s.email), new Date(g.timestamp).toLocaleString("es-CO")].join(","));
-    });
-  });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `inscripcion_${asesor.replace(/\s+/g,"_")}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadExcel_(excelRows_(groups, asesor), `inscripcion_${asesor.replace(/\s+/g,"_")}.xlsx`, "Inscripción");
+}
+
+const MIN_GRADE = 3.5;
+function parseStudentsText_(text){
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.trim());
+  if(!lines.length) return [];
+  // Formato 1: tabla pegada desde Excel (con encabezados, separada por tabulaciones)
+  if(lines[0].includes("\t")){
+    const norm = h => h.normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase();
+    const head = lines[0].split("\t").map(norm);
+    const col = (...names) => head.findIndex(h => names.some(n => h.startsWith(n)));
+    const iNom = col("nombre"), iApe = col("apellido"), iMail = col("direccion de correo","correo","email");
+    const iCed = col("documento","cedula"), iCod = col("codigo banner","id banner","idbanner","codigo");
+    const iNota = col("total del curso","nota"), iApr = col("aprobo");
+    if(iCed === -1) throw new Error("No encontré la columna de documento/cédula en el encabezado.");
+    return lines.slice(1).map(l => {
+      const c = l.split("\t");
+      const g = i => i === -1 ? "" : (c[i] || "").trim();
+      const nota = parseFloat(g(iNota).replace(",", "."));
+      const approved = iApr !== -1 ? /^s/i.test(g(iApr)) : (!isNaN(nota) && nota >= MIN_GRADE);
+      return { cedula: g(iCed), code: g(iCod), name: [g(iNom), g(iApe)].filter(Boolean).join(" ").toUpperCase(), email: g(iMail), approved };
+    }).filter(st => st.cedula);
+  }
+  // Formato 2: Cédula | ID | Nombre | Correo | Aprobó
+  return lines.map(line => {
+    const parts = line.split("|").map(x => x.trim());
+    return { cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", email: parts[3]||"", approved: /^s/i.test(parts[4]||"") };
+  }).filter(st => st.cedula && /\d/.test(st.cedula));
 }
 
 async function saveStudents(){
   const text = document.getElementById("studentTextarea").value;
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-  const students = lines.map(line => {
-    const parts = line.split("|").map(p => p.trim());
-    return {
-      cedula: parts[0]||"", code: parts[1]||"", name: parts[2]||"", email: parts[3]||"",
-      approved: /^s/i.test(parts[4]||"")
-    };
-  }).filter(s => s.cedula);
+  let students;
+  try{ students = parseStudentsText_(text); }
+  catch(e){ document.getElementById("studentsMsg").innerHTML = `<div class="msg error">${escapeHTML(e.message)}</div>`; return; }
 
   const msg = document.getElementById("studentsMsg");
   if(students.length === 0){
@@ -1031,21 +1116,11 @@ function csvSafe(v){
 }
 function exportCSV(){
   const groups = window._lastGroups || [];
-  const header = ["Código grupo","Nombre estudiante","ID","Cédula","Correo","Fecha registro"];
-  const lines = [header.join(",")];
-  groups.slice().sort((a,b) => (a.groupCode||"").localeCompare(b.groupCode||"", undefined, {numeric:true})).forEach(g => {
-    g.students.forEach(s => {
-      lines.push([csvSafe(g.groupCode||""), csvSafe(s.name), csvSafe(s.code), csvSafe(s.cedula), csvSafe(s.email), new Date(g.timestamp).toLocaleString("es-CO")].join(","));
-    });
-  });
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "grupos_IA55_trabajo_grado.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+  if(!groups.length){ alertMsg_("No hay grupos para exportar."); return; }
+  const fecha = new Date().toISOString().slice(0,10);
+  downloadExcel_(excelRows_(groups), `grupos_IA55_${fecha}.xlsx`, "Grupos");
 }
+function alertMsg_(t){ document.getElementById("groupsTableWrap").insertAdjacentHTML("afterbegin", `<div class="msg error">${escapeHTML(t)}</div>`); }
 
 initForm();
 </script>
